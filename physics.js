@@ -12,6 +12,20 @@ class DoublePendulumPhysics {
         this.l1 = 1.0;           // Length of first rod (m)
         this.l2 = 1.0;           // Length of second rod (m)
         
+        // Material properties
+        this.radius1 = 0.05;     // Radius of first bob (m)
+        this.radius2 = 0.05;     // Radius of second bob (m)
+        this.rodRadius = 0.005;  // Radius of connecting rods (m)
+        this.density = 7850;     // Density of steel (kg/m³)
+        this.elasticModulus = 200e9; // Young's modulus for steel (Pa)
+        this.internalDamping = 0.001; // Internal material damping coefficient
+        
+        // Rotational properties
+        this.I1 = this.calculateMomentOfInertia(this.m1, this.radius1); // Moment of inertia of first bob
+        this.I2 = this.calculateMomentOfInertia(this.m2, this.radius2); // Moment of inertia of second bob
+        this.rodI1 = this.calculateRodMomentOfInertia(this.l1); // Moment of inertia of first rod
+        this.rodI2 = this.calculateRodMomentOfInertia(this.l2); // Moment of inertia of second rod
+        
         // State variables
         this.theta1 = Math.PI / 2;  // Angle of first pendulum (rad)
         this.theta2 = Math.PI / 2;  // Angle of second pendulum (rad)
@@ -19,8 +33,14 @@ class DoublePendulumPhysics {
         this.omega2 = 0.0;          // Angular velocity of second pendulum (rad/s)
         
         // Environmental factors
-        this.damping = 0.0;         // Air resistance coefficient
+        this.temperature = 293.15;   // Temperature in Kelvin (20°C)
+        this.airDensity = 1.225;    // Air density at 20°C (kg/m³)
+        this.airViscosity = 1.81e-5; // Air dynamic viscosity at 20°C (Pa·s)
         this.externalForce = { x: 0, y: 0 }; // External force vector
+        
+        // Joint properties
+        this.maxJointAngle = Math.PI * 0.95; // Maximum joint angle (rad)
+        this.jointStiffness = 1000;  // Joint stiffness (N·m/rad)
         
         // Simulation control
         this.timeStep = 0.01;       // Integration time step (s)
@@ -40,14 +60,84 @@ class DoublePendulumPhysics {
      * Calculate derivatives for the system of differential equations
      * Uses the full nonlinear equations of motion derived from Lagrangian mechanics
      */
+    calculateMomentOfInertia(mass, radius) {
+        // I = 2/5 * m * r² for solid sphere
+        return (2/5) * mass * radius * radius;
+    }
+    
+    calculateRodMomentOfInertia(length) {
+        // I = 1/12 * m * L² for thin rod
+        const rodMass = Math.PI * this.rodRadius * this.rodRadius * length * this.density;
+        return (1/12) * rodMass * length * length;
+    }
+    
+    calculateReynoldsNumber(velocity, radius) {
+        return (this.airDensity * velocity * 2 * radius) / this.airViscosity;
+    }
+    
+    calculateDragCoefficient(reynolds) {
+        // Approximate drag coefficient for a sphere based on Reynolds number
+        if (reynolds < 1) {
+            return 24 / reynolds;
+        } else if (reynolds < 1000) {
+            return 24 / reynolds * (1 + 0.15 * Math.pow(reynolds, 0.687));
+        } else {
+            return 0.44;
+        }
+    }
+    
+    calculateAirResistance(velocity, radius) {
+        const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+        const reynolds = this.calculateReynoldsNumber(speed, radius);
+        const cd = this.calculateDragCoefficient(reynolds);
+        const area = Math.PI * radius * radius;
+        const dragMagnitude = 0.5 * this.airDensity * cd * area * speed * speed;
+        
+        if (speed < 1e-10) return { x: 0, y: 0 };
+        
+        return {
+            x: -dragMagnitude * velocity.x / speed,
+            y: -dragMagnitude * velocity.y / speed
+        };
+    }
+    
+    calculateElasticForce(theta1, theta2) {
+        // Calculate elastic forces in the rods due to bending
+        const bendingAngle1 = Math.abs(theta1) - this.maxJointAngle;
+        const bendingAngle2 = Math.abs(theta2 - theta1) - this.maxJointAngle;
+        
+        const elasticTorque1 = bendingAngle1 > 0 ? -this.jointStiffness * bendingAngle1 * Math.sign(theta1) : 0;
+        const elasticTorque2 = bendingAngle2 > 0 ? -this.jointStiffness * bendingAngle2 * Math.sign(theta2 - theta1) : 0;
+        
+        return { torque1: elasticTorque1, torque2: elasticTorque2 };
+    }
+    
     calculateDerivatives(theta1, theta2, omega1, omega2) {
         const cosDiff = Math.cos(theta1 - theta2);
         const sinDiff = Math.sin(theta1 - theta2);
         
-        // Denominator for angular acceleration calculations
-        const denom = this.m1 + this.m2 * sinDiff * sinDiff;
+        // Get positions and velocities for air resistance calculation
+        const positions = this.getPositions();
+        const v1x = this.omega1 * this.l1 * Math.cos(theta1);
+        const v1y = -this.omega1 * this.l1 * Math.sin(theta1);
+        const v2x = v1x + this.omega2 * this.l2 * Math.cos(theta2);
+        const v2y = v1y - this.omega2 * this.l2 * Math.sin(theta2);
         
-        // Calculate angular accelerations using Lagrangian mechanics
+        // Calculate air resistance
+        const drag1 = this.calculateAirResistance({ x: v1x, y: v1y }, this.radius1);
+        const drag2 = this.calculateAirResistance({ x: v2x, y: v2y }, this.radius2);
+        
+        // Calculate elastic forces
+        const elasticForces = this.calculateElasticForce(theta1, theta2);
+        
+        // Total moment of inertia including rods
+        const I1_total = this.I1 + this.rodI1;
+        const I2_total = this.I2 + this.rodI2;
+        
+        // Denominator for angular acceleration calculations
+        const denom = (I1_total + I2_total) * this.m1 + this.m2 * sinDiff * sinDiff;
+        
+        // Calculate angular accelerations using modified Lagrangian mechanics
         const alpha1 = (
             -this.g * (2 * this.m1 + this.m2) * Math.sin(theta1)
             - this.m2 * this.g * Math.sin(theta1 - 2 * theta2)
@@ -55,6 +145,8 @@ class DoublePendulumPhysics {
                 omega2 * omega2 * this.l2
                 + omega1 * omega1 * this.l1 * cosDiff
             )
+            + elasticForces.torque1
+            + (drag1.x * Math.cos(theta1) + drag1.y * Math.sin(theta1)) * this.l1
         ) / (this.l1 * denom);
         
         const alpha2 = (
@@ -63,11 +155,13 @@ class DoublePendulumPhysics {
                 + this.g * (this.m1 + this.m2) * Math.cos(theta1)
                 + omega2 * omega2 * this.l2 * this.m2 * cosDiff
             )
+            + elasticForces.torque2
+            + (drag2.x * Math.cos(theta2) + drag2.y * Math.sin(theta2)) * this.l2
         ) / (this.l2 * denom);
         
-        // Apply damping (air resistance)
-        const damping1 = -this.damping * omega1;
-        const damping2 = -this.damping * omega2;
+        // Apply internal damping
+        const internalDamping1 = -this.internalDamping * omega1;
+        const internalDamping2 = -this.internalDamping * omega2;
         
         // Apply external forces if present
         const externalAlpha1 = this.externalForce.x * Math.cos(theta1) / (this.m1 * this.l1);
@@ -76,8 +170,8 @@ class DoublePendulumPhysics {
         return {
             dTheta1: omega1,
             dTheta2: omega2,
-            dOmega1: alpha1 + damping1 + externalAlpha1,
-            dOmega2: alpha2 + damping2 + externalAlpha2
+            dOmega1: alpha1 + internalDamping1 + externalAlpha1,
+            dOmega2: alpha2 + internalDamping2 + externalAlpha2
         };
     }
     
@@ -169,25 +263,34 @@ class DoublePendulumPhysics {
     calculateEnergy() {
         const positions = this.getPositions();
         
-        // Kinetic energy
+        // Translational kinetic energy
         const v1x = this.omega1 * this.l1 * Math.cos(this.theta1);
         const v1y = -this.omega1 * this.l1 * Math.sin(this.theta1);
         const v2x = v1x + this.omega2 * this.l2 * Math.cos(this.theta2);
         const v2y = v1y - this.omega2 * this.l2 * Math.sin(this.theta2);
         
-        const ke1 = 0.5 * this.m1 * (v1x * v1x + v1y * v1y);
-        const ke2 = 0.5 * this.m2 * (v2x * v2x + v2y * v2y);
-        const kineticEnergy = ke1 + ke2;
+        const ke1_trans = 0.5 * this.m1 * (v1x * v1x + v1y * v1y);
+        const ke2_trans = 0.5 * this.m2 * (v2x * v2x + v2y * v2y);
         
-        // Potential energy (relative to pivot)
-        const pe1 = this.m1 * this.g * (positions.bob1.y + this.l1);
-        const pe2 = this.m2 * this.g * (positions.bob2.y + this.l1 + this.l2);
+        // Rotational kinetic energy
+        const ke1_rot = 0.5 * (this.I1 + this.rodI1) * this.omega1 * this.omega1;
+        const ke2_rot = 0.5 * (this.I2 + this.rodI2) * this.omega2 * this.omega2;
+        
+        const kineticEnergy = ke1_trans + ke2_trans + ke1_rot + ke2_rot;
+        
+        // Potential energy (relative to pivot point at y=0)
+        const pe1 = this.m1 * this.g * positions.bob1.y;
+        const pe2 = this.m2 * this.g * positions.bob2.y;
         const potentialEnergy = pe1 + pe2;
+        
+        // The total mechanical energy should be constant
+        // We'll subtract the initial potential energy to set the baseline
+        const initialPE = (this.m1 + this.m2) * this.g * (-this.l1 - this.l2);
         
         return {
             kinetic: kineticEnergy,
-            potential: potentialEnergy,
-            total: kineticEnergy + potentialEnergy
+            potential: potentialEnergy - initialPE,
+            total: kineticEnergy + (potentialEnergy - initialPE)
         };
     }
     

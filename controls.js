@@ -17,6 +17,7 @@ class PendulumControls {
         // Animation control
         this.animationId = null;
         this.isRunning = false;
+        this.simulationSpeed = 1.0;
         
         this.initializeControls();
         this.setupEventListeners();
@@ -193,7 +194,25 @@ class PendulumControls {
     /**
      * Setup event listeners
      */
+    /**
+     * Update simulation speed
+     */
+    updateSimulationSpeed(speed) {
+        this.simulationSpeed = parseFloat(speed);
+        document.getElementById('speed-value').textContent = `${speed}×`;
+        // Update the physics engine's time step
+        this.physics.timeStep = 0.01 * this.simulationSpeed;
+    }
+
     setupEventListeners() {
+        // Add speed slider listener
+        const speedSlider = document.getElementById('speed-slider');
+        if (speedSlider) {
+            speedSlider.addEventListener('input', (e) => {
+                this.updateSimulationSpeed(e.target.value);
+            });
+        }
+
         // Play/Pause button
         document.getElementById('play-pause-btn').addEventListener('click', () => {
             this.toggleSimulation();
