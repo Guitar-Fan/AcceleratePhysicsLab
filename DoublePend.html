@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Double Pendulum Physics Laboratory</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Core Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    
+    <!-- Custom Styles -->
+    <style>
+        :root {
+            --primary-bg: #1a1d29;
+            --secondary-bg: #2d3748;
+            --accent-color: #c17817;
+            --text-primary: #f8f6f0;
+            --text-secondary: #a0aec0;
+            --control-bg: rgba(45, 55, 72, 0.9);
+            --border-color: rgba(248, 246, 240, 0.2);
+            --success-color: #10b981;
+            --error-color: #ef4444;
+            --warning-color: #f59e0b;
+            --info-color: #3b82f6;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--primary-bg);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* Navigation */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(26, 29, 41, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            z-index: 1000;
+            padding: 0 2rem;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .nav-brand {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-link {
+            color: var(--text-primary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+            position: relative;
+        }
+
+        .nav-link:hover {
+            color: var(--accent-color);
+        }
+
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--accent-color);
+            transition: width 0.3s ease;
+        }
+
+        .nav-link:hover::after {
+            width: 100%;
+        }
+
+        /* Main Layout */
+        .main-container {
+            margin-top: 60px;
+            display: grid;
+            grid-template-columns: 300px 1fr 250px;
+            grid-template-rows: 1fr auto;
+            height: calc(100vh - 60px);
+            gap: 1px;
+            background: var(--border-color);
+        }
+
+        /* Control Panel */
+        .control-panel {
+            background: var(--control-bg);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .panel-header h3 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.2rem;
+            color: var(--accent-color);
+        }
+
+        .panel-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .control-btn {
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+
+        .control-btn:hover {
+            background: var(--accent-color);
+            transform: translateY(-1px);
+        }
+
+        /* Control Sections */
+        .control-section {
+            margin-bottom: 2rem;
+        }
+
+        .control-section h4 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .control-group {
+            margin-bottom: 1rem;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .control-group input[type="range"] {
+            width: 100%;
+            height: 4px;
+            background: var(--secondary-bg);
+            border-radius: 2px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .control-group input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .control-group input[type="checkbox"] {
+            margin-right: 0.5rem;
+        }
+
+        /* Mode Controls */
+        .mode-controls {
+            margin-bottom: 2rem;
+        }
+
+        .mode-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        .mode-btn {
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.8rem;
+        }
+
+        .mode-btn:hover, .mode-btn.active {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        /* Simulation Area */
+        .simulation-area {
+            background: var(--primary-bg);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #pendulum-canvas {
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 8px;
+        }
+
+        /* Data Panel */
+        .data-panel {
+            background: var(--control-bg);
+            backdrop-filter: blur(10px);
+            border-left: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .data-section {
+            margin-bottom: 2rem;
+        }
+
+        .data-section h4 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .data-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .data-label {
+            color: var(--text-secondary);
+        }
+
+        .data-value {
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Preset Controls */
+        .preset-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .preset-btn {
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.8rem;
+            text-align: left;
+        }
+
+        .preset-btn:hover, .preset-btn.active {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        /* Bottom Toolbar */
+        .bottom-toolbar {
+            grid-column: 1 / -1;
+            background: var(--control-bg);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .toolbar-btn {
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.85rem;
+        }
+
+        .toolbar-btn:hover {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        /* Notifications */
+        .notification {
+            position: fixed;
+            top: 80px;
+            right: 2rem;
+            background: var(--control-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            z-index: 1001;
+            backdrop-filter: blur(10px);
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.error {
+            border-color: var(--error-color);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .notification.success {
+            border-color: var(--success-color);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        /* Help Dialog */
+        .help-dialog {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .help-content {
+            background: var(--control-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            backdrop-filter: blur(10px);
+        }
+
+        .help-content h2 {
+            font-family: 'Playfair Display', serif;
+            color: var(--accent-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .help-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .help-section h3 {
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .help-section ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .help-section li {
+            margin-bottom: 0.5rem;
+            padding-left: 1rem;
+            position: relative;
+        }
+
+        .help-section li::before {
+            content: '•';
+            color: var(--accent-color);
+            position: absolute;
+            left: 0;
+        }
+
+        .close-btn {
+            background: var(--accent-color);
+            border: none;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .main-container {
+                grid-template-columns: 250px 1fr 200px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr auto;
+            }
+
+            .control-panel, .data-panel {
+                height: 300px;
+            }
+
+            .navbar {
+                padding: 0 1rem;
+            }
+
+            .nav-links {
+                gap: 1rem;
+            }
+
+            .bottom-toolbar {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .toolbar-group {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+
+        /* Loading Animation */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: var(--text-secondary);
+        }
+
+        .loading::after {
+            content: '';
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-color);
+            border-top: 2px solid var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--secondary-bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--accent-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-color);
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <a href="index.html" class="nav-brand">Double Pendulum Lab</a>
+        <ul class="nav-links">
+            <li><a href="index.html" class="nav-link">Simulation</a></li>
+            <li><a href="chaos.html" class="nav-link">Chaos Theory</a></li>
+            <li><a href="education.html" class="nav-link">Education</a></li>
+            <li><a href="analysis.html" class="nav-link">Analysis</a></li>
+        </ul>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <div class="panel-header">
+                <h3>Physics Laboratory</h3>
+                <div class="panel-controls">
+                    <button id="play-pause-btn" class="control-btn" title="Play/Pause (Space)">▶️</button>
+                    <button id="reset-btn" class="control-btn" title="Reset (R)">🔄</button>
+                    <button id="help-btn" class="control-btn" title="Help">❓</button>
+                </div>
+            </div>
+
+            <!-- Presets -->
+            <div class="data-section">
+                <h4>Presets</h4>
+                <div class="preset-container" id="preset-container">
+                    <!-- Preset buttons will be added by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Physics Controls -->
+            <div class="control-section">
+                <h4>Physical Parameters</h4>
+                <div class="control-group">
+                    <label>Mass 1 (kg): <span id="m1-value">1.0</span></label>
+                    <input type="range" id="m1-slider" min="0.1" max="5.0" step="0.1" value="1.0">
+                </div>
+                <div class="control-group">
+                    <label>Mass 2 (kg): <span id="m2-value">1.0</span></label>
+                    <input type="range" id="m2-slider" min="0.1" max="5.0" step="0.1" value="1.0">
+                </div>
+                <div class="control-group">
+                    <label>Length 1 (m): <span id="l1-value">1.0</span></label>
+                    <input type="range" id="l1-slider" min="0.1" max="2.0" step="0.1" value="1.0">
+                </div>
+                <div class="control-group">
+                    <label>Length 2 (m): <span id="l2-value">1.0</span></label>
+                    <input type="range" id="l2-slider" min="0.1" max="2.0" step="0.1" value="1.0">
+                </div>
+                <div class="control-group">
+                    <label>Gravity (m/s²): <span id="g-value">9.81</span></label>
+                    <input type="range" id="g-slider" min="1.0" max="20.0" step="0.1" value="9.81">
+                </div>
+            </div>
+
+            <!-- Initial Conditions -->
+            <div class="control-section">
+                <h4>Initial Conditions</h4>
+                <div class="control-group">
+                    <label>Angle 1 (°): <span id="theta1-value">90.0</span></label>
+                    <input type="range" id="theta1-slider" min="-180" max="180" step="1" value="90">
+                </div>
+                <div class="control-group">
+                    <label>Angle 2 (°): <span id="theta2-value">90.0</span></label>
+                    <input type="range" id="theta2-slider" min="-180" max="180" step="1" value="90">
+                </div>
+                <div class="control-group">
+                    <label>Velocity 1 (°/s): <span id="omega1-value">0.0</span></label>
+                    <input type="range" id="omega1-slider" min="-360" max="360" step="1" value="0">
+                </div>
+                <div class="control-group">
+                    <label>Velocity 2 (°/s): <span id="omega2-value">0.0</span></label>
+                    <input type="range" id="omega2-slider" min="-360" max="360" step="1" value="0">
+                </div>
+            </div>
+
+            <!-- Environment -->
+            <div class="control-section">
+                <h4>Environment</h4>
+                <div class="control-group">
+                    <label>Simulation Speed: <span id="speed-value">1.00×</span></label>
+                    <input type="range" id="speed-slider" min="0.1" max="2.0" step="0.1" value="1.0">
+                </div>
+                <div class="control-group">
+                    <label>Air Resistance: <span id="damping-value">0.00</span></label>
+                    <input type="range" id="damping-slider" min="0.0" max="0.1" step="0.01" value="0.0">
+                </div>
+                <div class="control-group">
+                    <label>External Force X: <span id="force-x-value">0.0</span></label>
+                    <input type="range" id="force-x-slider" min="-10" max="10" step="0.5" value="0">
+                </div>
+                <div class="control-group">
+                    <label>External Force Y: <span id="force-y-value">0.0</span></label>
+                    <input type="range" id="force-y-slider" min="-10" max="10" step="0.5" value="0">
+                </div>
+            </div>
+
+            <!-- Mode Controls -->
+            <div class="control-section">
+                <h4>Simulation Mode</h4>
+                <div class="mode-buttons">
+                    <button id="normal-mode" class="mode-btn active">Normal</button>
+                    <button id="trace-mode" class="mode-btn">Trace</button>
+                    <button id="chaos-mode" class="mode-btn">Chaos</button>
+                    <button id="slow-mode" class="mode-btn">Slow Motion</button>
+                </div>
+            </div>
+
+            <!-- Visualization Controls -->
+            <div class="control-section">
+                <h4>Visualization</h4>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="show-trajectory" checked>
+                        Show Trajectory
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="show-energy" checked>
+                        Show Energy
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="show-velocity">
+                        Show Velocity Vectors
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="show-forces">
+                        Show Force Vectors
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Simulation Area -->
+        <div class="simulation-area">
+            <canvas id="pendulum-canvas"></canvas>
+        </div>
+
+        <!-- Data Panel -->
+        <div class="data-panel">
+            <div class="data-section">
+                <h4>Real-time Data</h4>
+                <div id="state-display">
+                    <div class="data-item">
+                        <span class="data-label">θ₁:</span>
+                        <span class="data-value">90.0°</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">θ₂:</span>
+                        <span class="data-value">90.0°</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">ω₁:</span>
+                        <span class="data-value">0.0°/s</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">ω₂:</span>
+                        <span class="data-value">0.0°/s</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="data-section">
+                <h4>Energy Analysis</h4>
+                <div id="energy-display">
+                    <div class="data-item">
+                        <span class="data-label">Kinetic:</span>
+                        <span class="data-value">0.000 J</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Potential:</span>
+                        <span class="data-value">0.000 J</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Total:</span>
+                        <span class="data-value">0.000 J</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="data-section" id="chaos-section" style="display: none;">
+                <h4>Chaos Analysis</h4>
+                <div id="chaos-display">
+                    <div class="data-item">
+                        <span class="data-label">Avg Divergence:</span>
+                        <span class="data-value">0.000 m</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Max Divergence:</span>
+                        <span class="data-value">0.000 m</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="data-section">
+                <h4>Data Export</h4>
+                <div class="toolbar-group">
+                    <button id="export-btn" class="toolbar-btn">Export Data</button>
+                    <button id="clear-data-btn" class="toolbar-btn">Clear Data</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Toolbar -->
+        <div class="bottom-toolbar">
+            <div class="toolbar-group">
+                <span>Double Pendulum Physics Laboratory</span>
+                <span id="simulation-time">Time: 0.00s</span>
+            </div>
+            <div class="toolbar-group">
+                <button class="toolbar-btn" onclick="window.open('https://github.com/your-repo', '_blank')">
+                    📊 Source Code
+                </button>
+                <button class="toolbar-btn" onclick="window.open('https://en.wikipedia.org/wiki/Double_pendulum', '_blank')">
+                    📚 Wikipedia
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load JavaScript Files -->
+    <script src="physics.js"></script>
+    <script src="visualization.js"></script>
+    <script src="controls.js"></script>
+    <script src="main.js"></script>
+
+    <!-- Initialize Application -->
+    <script>
+        // Add smooth scrolling and animations
+        document.addEventListener('DOMContentLoaded', function() {
+            // Animate control panel entrance
+            anime({
+                targets: '.control-panel',
+                translateX: [-300, 0],
+                opacity: [0, 1],
+                duration: 800,
+                easing: 'easeOutQuart',
+                delay: 200
+            });
+
+            // Animate data panel entrance
+            anime({
+                targets: '.data-panel',
+                translateX: [300, 0],
+                opacity: [0, 1],
+                duration: 800,
+                easing: 'easeOutQuart',
+                delay: 400
+            });
+
+            // Animate simulation area
+            anime({
+                targets: '.simulation-area',
+                opacity: [0, 1],
+                scale: [0.9, 1],
+                duration: 1000,
+                easing: 'easeOutQuart',
+                delay: 600
+            });
+
+            // Add hover effects to buttons
+            document.querySelectorAll('.control-btn, .mode-btn, .preset-btn, .toolbar-btn').forEach(btn => {
+                btn.addEventListener('mouseenter', function() {
+                    anime({
+                        targets: this,
+                        scale: 1.05,
+                        duration: 200,
+                        easing: 'easeOutQuart'
+                    });
+                });
+
+                btn.addEventListener('mouseleave', function() {
+                    anime({
+                        targets: this,
+                        scale: 1,
+                        duration: 200,
+                        easing: 'easeOutQuart'
+                    });
+                });
+            });
+
+            // Add slider animation feedback
+            document.querySelectorAll('input[type="range"]').forEach(slider => {
+                slider.addEventListener('input', function() {
+                    anime({
+                        targets: this,
+                        scale: [1, 1.02, 1],
+                        duration: 300,
+                        easing: 'easeOutQuart'
+                    });
+                });
+            });
+        });
+
+        // Update simulation time display
+        setInterval(function() {
+            if (window.pendulumApp && window.pendulumApp.physics) {
+                const timeElement = document.getElementById('simulation-time');
+                if (timeElement) {
+                    timeElement.textContent = `Time: ${window.pendulumApp.physics.time.toFixed(2)}s`;
+                }
+            }
+        }, 100);
+
+        // Show/hide chaos section based on mode
+        document.addEventListener('modeChanged', function(e) {
+            const chaosSection = document.getElementById('chaos-section');
+            if (e.detail.mode === 'chaos') {
+                chaosSection.style.display = 'block';
+                anime({
+                    targets: chaosSection,
+                    opacity: [0, 1],
+                    duration: 500,
+                    easing: 'easeOutQuart'
+                });
+            } else {
+                anime({
+                    targets: chaosSection,
+                    opacity: [1, 0],
+                    duration: 500,
+                    easing: 'easeOutQuart',
+                    complete: function() {
+                        chaosSection.style.display = 'none';
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
