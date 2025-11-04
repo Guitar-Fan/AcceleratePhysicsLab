@@ -232,6 +232,12 @@ class PendulumControls {
         // Visualization toggles
         this.setupVisualizationListeners();
         
+        // New interactive controls
+        this.setupConnectionTypeListeners();
+        this.setupStringControlListeners();
+        this.setupFunModeListeners();
+        this.setupInteractiveListeners();
+        
         // Canvas interaction
         this.setupCanvasInteraction();
         
@@ -340,17 +346,19 @@ class PendulumControls {
     }
     
     /**
-     * Setup canvas interaction
+     * Setup canvas interaction with enhanced mouse controls
      */
     setupCanvasInteraction() {
         const canvas = this.visualization.canvas;
+        let isMouseDown = false;
         
         canvas.addEventListener('mousedown', (e) => {
+            isMouseDown = true;
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
             
-            // Check if clicking on a pendulum bob
+            // Check if clicking on a pendulum bob for dragging
             const positions = this.physics.getPositions();
             const bob1X = this.visualization.centerX + positions.bob1.x * this.visualization.scale;
             const bob1Y = this.visualization.centerY + positions.bob1.y * this.visualization.scale;
@@ -360,58 +368,122 @@ class PendulumControls {
             const dist1 = Math.sqrt((x - bob1X) ** 2 + (y - bob1Y) ** 2);
             const dist2 = Math.sqrt((x - bob2X) ** 2 + (y - bob2Y) ** 2);
             
-            if (dist1 < 20) {
+            if (this.physics.mouseInteraction && (dist1 < 25 || dist2 < 25)) {
                 this.isDragging = true;
-                this.dragTarget = 'bob1';
-            } else if (dist2 < 20) {
-                this.isDragging = true;
-                this.dragTarget = 'bob2';
+                this.dragTarget = dist1 < dist2 ? 'bob1' : 'bob2';
+                
+                // Visual feedback for grab
+                canvas.style.cursor = 'grabbing';
+                
+                // Add sound effect if enabled
+                if (this.physics.soundEffects) {
+                    this.visualization.addSoundEffect(x, y, 'pop');
+                }
+            } else if (this.physics.clickForce) {
+                // Apply click force at mouse position
+                this.applyClickForce(x, y);
             }
         });
         
         canvas.addEventListener('mousemove', (e) => {
-            if (!this.isDragging) return;
-            
             const rect = canvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left - this.visualization.centerX) / this.visualization.scale;
-            const y = (e.clientY - rect.top - this.visualization.centerY) / this.visualization.scale;
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
             
-            if (this.dragTarget === 'bob1') {
-                this.physics.theta1 = Math.atan2(x, y);
-                this.updateSlider('theta1', this.physics.theta1 * 180 / Math.PI);
-            } else if (this.dragTarget === 'bob2') {
+            // Update mouse force application
+            if (this.physics.mouseInteraction && this.physics.applyMouseForce) {
+                this.physics.applyMouseForce(mouseX, mouseY, canvas.width, canvas.height);
+            }
+            
+            // Handle dragging
+            if (this.isDragging) {
+                const x = (mouseX - this.visualization.centerX) / this.visualization.scale;
+                const y = (mouseY - this.visualization.centerY) / this.visualization.scale;
+                
+                if (this.dragTarget === 'bob1') {
+                    this.physics.theta1 = Math.atan2(x, -y); // Note: -y because canvas y is flipped
+                    this.updateSlider('theta1', this.physics.theta1 * 180 / Math.PI);
+                } else if (this.dragTarget === 'bob2') {
+                    const positions = this.physics.getPositions();
+                    const relX = x - positions.bob1.x;
+                    const relY = -y - positions.bob1.y; // Note: -y because canvas y is flipped
+                    this.physics.theta2 = Math.atan2(relX, -relY);
+                    this.updateSlider('theta2', this.physics.theta2 * 180 / Math.PI);
+                }
+            }
+            
+            // Change cursor on hover over bobs
+            if (!this.isDragging && this.physics.mouseInteraction) {
                 const positions = this.physics.getPositions();
-                const relX = x - positions.bob1.x;
-                const relY = y - positions.bob1.y;
-                this.physics.theta2 = Math.atan2(relX, relY);
-                this.updateSlider('theta2', this.physics.theta2 * 180 / Math.PI);
+                const bob1X = this.visualization.centerX + positions.bob1.x * this.visualization.scale;
+                const bob1Y = this.visualization.centerY + positions.bob1.y * this.visualization.scale;
+                const bob2X = this.visualization.centerX + positions.bob2.x * this.visualization.scale;
+                const bob2Y = this.visualization.centerY + positions.bob2.y * this.visualization.scale;
+                
+                const dist1 = Math.sqrt((mouseX - bob1X) ** 2 + (mouseY - bob1Y) ** 2);
+                const dist2 = Math.sqrt((mouseX - bob2X) ** 2 + (mouseY - bob2Y) ** 2);
+                
+                if (dist1 < 25 || dist2 < 25) {
+                    canvas.style.cursor = 'grab';
+                } else {
+                    canvas.style.cursor = this.physics.clickForce ? 'crosshair' : 'default';
+                }
             }
         });
         
-        canvas.addEventListener('mouseup', () => {
+        canvas.addEventListener('mouseup', (e) => {
+            isMouseDown = false;
             this.isDragging = false;
             this.dragTarget = null;
+            canvas.style.cursor = this.physics.clickForce ? 'crosshair' : 'default';
         });
         
-        canvas.addEventListener('click', (e) => {
-            if (this.isDragging) return;
-            
-            const rect = canvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left - this.visualization.centerX) / this.visualization.scale;
-            const y = (e.clientY - rect.top - this.visualization.centerY) / this.visualization.scale;
-            
-            // Apply impulse force at click location
-            this.physics.applyForce({ x: x * 0.1, y: y * 0.1 });
-            
-            // Clear force after a short time
-            setTimeout(() => {
-                this.physics.clearForces();
-                document.getElementById('force-x-slider').value = 0;
-                document.getElementById('force-y-slider').value = 0;
-                document.getElementById('force-x-value').textContent = '0';
-                document.getElementById('force-y-value').textContent = '0';
-            }, 100);
+        canvas.addEventListener('mouseleave', () => {
+            this.isDragging = false;
+            this.dragTarget = null;
+            canvas.style.cursor = 'default';
         });
+    }
+    
+    /**
+     * Apply click force at mouse position
+     */
+    applyClickForce(x, y) {
+        // Convert screen coordinates to physics coordinates
+        const physX = (x - this.visualization.centerX) / this.visualization.scale;
+        const physY = (y - this.visualization.centerY) / this.visualization.scale;
+        
+        // Find closest bob and apply force
+        const positions = this.physics.getPositions();
+        const dist1 = Math.sqrt((physX - positions.bob1.x) ** 2 + (physY - positions.bob1.y) ** 2);
+        const dist2 = Math.sqrt((physX - positions.bob2.x) ** 2 + (physY - positions.bob2.y) ** 2);
+        
+        const forceStrength = 2.0;
+        
+        if (dist1 < dist2) {
+            // Apply force to bob1
+            const fx = (physX - positions.bob1.x) * forceStrength;
+            const fy = (physY - positions.bob1.y) * forceStrength;
+            this.physics.externalForce.x += fx;
+            this.physics.externalForce.y += fy;
+        } else {
+            // Apply force to bob2
+            const fx = (physX - positions.bob2.x) * forceStrength;
+            const fy = (physY - positions.bob2.y) * forceStrength;
+            this.physics.externalForce.x += fx;
+            this.physics.externalForce.y += fy;
+        }
+        
+        // Visual feedback
+        if (this.physics.soundEffects) {
+            this.visualization.addSoundEffect(x, y, 'bounce');
+        }
+        
+        // Decay the applied force
+        setTimeout(() => {
+            this.physics.externalForce.x *= 0.5;
+            this.physics.externalForce.y *= 0.5;
+        }, 100);
     }
     
     /**
@@ -573,6 +645,181 @@ class PendulumControls {
         this.updateSlider('damping', this.physics.damping);
         this.updateSlider('force-x', this.physics.externalForce.x);
         this.updateSlider('force-y', this.physics.externalForce.y);
+    }
+    
+    /**
+     * Setup connection type listeners
+     */
+    setupConnectionTypeListeners() {
+        const connectionModes = ['rod', 'string', 'spring', 'noodle'];
+        
+        connectionModes.forEach(mode => {
+            const btn = document.getElementById(`${mode}-mode`);
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    this.physics.pendulumType = mode;
+                    
+                    // Update button states
+                    connectionModes.forEach(m => {
+                        const modeBtn = document.getElementById(`${m}-mode`);
+                        if (modeBtn) modeBtn.classList.remove('active');
+                    });
+                    btn.classList.add('active');
+                    
+                    // Show/hide string controls
+                    const stringControls = document.getElementById('string-controls');
+                    if (stringControls) {
+                        stringControls.style.display = (mode === 'string') ? 'block' : 'none';
+                    }
+                });
+            }
+        });
+    }
+    
+    /**
+     * Setup string control listeners
+     */
+    setupStringControlListeners() {
+        // String tension
+        const tensionSlider = document.getElementById('tension-slider');
+        const tensionValue = document.getElementById('tension-value');
+        if (tensionSlider) {
+            tensionSlider.addEventListener('input', (e) => {
+                this.physics.stringTension = parseFloat(e.target.value);
+                if (tensionValue) tensionValue.textContent = e.target.value;
+            });
+        }
+        
+        // Elasticity
+        const elasticitySlider = document.getElementById('elasticity-slider');
+        const elasticityValue = document.getElementById('elasticity-value');
+        if (elasticitySlider) {
+            elasticitySlider.addEventListener('input', (e) => {
+                this.physics.elasticity = parseFloat(e.target.value);
+                if (elasticityValue) elasticityValue.textContent = e.target.value;
+            });
+        }
+        
+        // String sag
+        const sagSlider = document.getElementById('sag-slider');
+        const sagValue = document.getElementById('sag-value');
+        if (sagSlider) {
+            sagSlider.addEventListener('input', (e) => {
+                this.physics.stringSag = parseFloat(e.target.value);
+                if (sagValue) sagValue.textContent = e.target.value;
+            });
+        }
+    }
+    
+    /**
+     * Setup fun mode listeners
+     */
+    setupFunModeListeners() {
+        const funModes = ['jello', 'balloon', 'disco', 'rainbow'];
+        
+        funModes.forEach(mode => {
+            const btn = document.getElementById(`${mode}-mode`);
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    this.physics.funMode = (this.physics.funMode === mode) ? 'normal' : mode;
+                    
+                    // Update button state
+                    btn.classList.toggle('active');
+                    
+                    // Deactivate other fun modes
+                    funModes.forEach(m => {
+                        if (m !== mode) {
+                            const otherBtn = document.getElementById(`${m}-mode`);
+                            if (otherBtn) otherBtn.classList.remove('active');
+                        }
+                    });
+                });
+            }
+        });
+        
+        // Sound effects toggle
+        const soundCheckbox = document.getElementById('sound-effects');
+        if (soundCheckbox) {
+            soundCheckbox.addEventListener('change', (e) => {
+                this.physics.soundEffects = e.target.checked;
+            });
+        }
+        
+        // Particle trails toggle
+        const particleCheckbox = document.getElementById('particle-trails');
+        if (particleCheckbox) {
+            particleCheckbox.addEventListener('change', (e) => {
+                this.physics.particleTrails = e.target.checked;
+            });
+        }
+        
+        // Bouncy walls toggle
+        const bouncyCheckbox = document.getElementById('bouncy-walls');
+        if (bouncyCheckbox) {
+            bouncyCheckbox.addEventListener('change', (e) => {
+                this.physics.bouncyWalls = e.target.checked;
+            });
+        }
+    }
+    
+    /**
+     * Setup interactive control listeners
+     */
+    setupInteractiveListeners() {
+        // Mouse interaction toggle
+        const mouseCheckbox = document.getElementById('mouse-interaction');
+        if (mouseCheckbox) {
+            mouseCheckbox.addEventListener('change', (e) => {
+                this.physics.mouseInteraction = e.target.checked;
+            });
+        }
+        
+        // Click force toggle
+        const clickCheckbox = document.getElementById('click-force');
+        if (clickCheckbox) {
+            clickCheckbox.addEventListener('change', (e) => {
+                this.physics.clickForce = e.target.checked;
+            });
+        }
+        
+        // String wobble toggle
+        const wobbleCheckbox = document.getElementById('string-wobble');
+        if (wobbleCheckbox) {
+            wobbleCheckbox.addEventListener('change', (e) => {
+                this.physics.stringWobble = e.target.checked ? 1.0 : 0.0;
+            });
+        }
+        
+        // String tension display toggle
+        const tensionDisplayCheckbox = document.getElementById('show-string-tension');
+        if (tensionDisplayCheckbox) {
+            tensionDisplayCheckbox.addEventListener('change', (e) => {
+                this.physics.showStringTension = e.target.checked;
+            });
+        }
+        
+        // Shake pendulum button
+        const shakeBtn = document.getElementById('shake-pendulum');
+        if (shakeBtn) {
+            shakeBtn.addEventListener('click', () => {
+                this.physics.shakeIntensity = 0.5; // Start strong shake
+                
+                // Visual feedback
+                shakeBtn.style.background = '#ff4444';
+                setTimeout(() => {
+                    shakeBtn.style.background = '';
+                }, 500);
+            });
+        }
+        
+        // Tickle mode button
+        const tickleBtn = document.getElementById('tickle-mode');
+        if (tickleBtn) {
+            tickleBtn.addEventListener('click', () => {
+                this.physics.tickleMode = !this.physics.tickleMode;
+                tickleBtn.classList.toggle('active');
+            });
+        }
     }
 }
 

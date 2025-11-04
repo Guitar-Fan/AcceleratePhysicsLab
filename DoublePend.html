@@ -526,6 +526,189 @@
             background: var(--accent-color);
             opacity: 0.8;
         }
+
+        /* Fun Mode Animations and Effects */
+        .mode-btn.jello-active {
+            animation: jello 0.5s ease-in-out infinite alternate;
+            background: linear-gradient(45deg, #00ff88, #88ff00) !important;
+        }
+
+        @keyframes jello {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.1) skew(2deg); }
+        }
+
+        .mode-btn.balloon-active {
+            animation: float 2s ease-in-out infinite;
+            background: linear-gradient(45deg, #ff6b9d, #c44569, #f8b500, #40739e) !important;
+            background-size: 400% 400%;
+            animation: float 2s ease-in-out infinite, colorShift 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-10px) rotate(2deg); }
+        }
+
+        .mode-btn.disco-active {
+            animation: disco 0.3s linear infinite;
+            background: linear-gradient(45deg, #ff0080, #ff8000, #80ff00, #00ff80, #0080ff, #8000ff) !important;
+            background-size: 600% 600%;
+            border: 2px solid #fff;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+
+        @keyframes disco {
+            0% { 
+                background-position: 0% 50%;
+                transform: rotate(0deg) scale(1);
+                box-shadow: 0 0 20px rgba(255, 0, 128, 0.8);
+            }
+            25% { 
+                background-position: 25% 50%;
+                transform: rotate(90deg) scale(1.05);
+                box-shadow: 0 0 20px rgba(255, 128, 0, 0.8);
+            }
+            50% { 
+                background-position: 50% 50%;
+                transform: rotate(180deg) scale(1);
+                box-shadow: 0 0 20px rgba(128, 255, 0, 0.8);
+            }
+            75% { 
+                background-position: 75% 50%;
+                transform: rotate(270deg) scale(1.05);
+                box-shadow: 0 0 20px rgba(0, 255, 128, 0.8);
+            }
+            100% { 
+                background-position: 100% 50%;
+                transform: rotate(360deg) scale(1);
+                box-shadow: 0 0 20px rgba(128, 0, 255, 0.8);
+            }
+        }
+
+        .mode-btn.rainbow-active {
+            animation: rainbow 2s linear infinite;
+            background: linear-gradient(45deg, #ff0000, #ff8000, #ffff00, #80ff00, #00ff00, #00ff80, #00ffff, #0080ff, #0000ff, #8000ff, #ff00ff, #ff0080) !important;
+            background-size: 1200% 1200%;
+        }
+
+        @keyframes rainbow {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 100% 50%; }
+        }
+
+        @keyframes colorShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        /* Shake Animation */
+        .shake-active {
+            animation: shake 0.5s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-2px) rotate(-1deg); }
+            20%, 40%, 60%, 80% { transform: translateX(2px) rotate(1deg); }
+        }
+
+        /* Tickle Mode */
+        .tickle-active {
+            animation: giggle 1s ease-in-out infinite;
+            background: linear-gradient(45deg, #ffeb3b, #ff9800) !important;
+        }
+
+        @keyframes giggle {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-2deg) scale(1.02); }
+            50% { transform: rotate(0deg) scale(1.05); }
+            75% { transform: rotate(2deg) scale(1.02); }
+        }
+
+        /* Bouncy walls effect */
+        .bouncy-walls-active {
+            background: linear-gradient(45deg, #e91e63, #9c27b0) !important;
+            animation: bounce 0.6s ease-in-out infinite alternate;
+        }
+
+        @keyframes bounce {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.1); }
+        }
+
+        /* String wobble effect */
+        .string-wobble-active {
+            animation: wobble 1s ease-in-out infinite;
+            background: linear-gradient(45deg, #00bcd4, #009688) !important;
+        }
+
+        @keyframes wobble {
+            0% { transform: rotate(0deg); }
+            25% { transform: rotate(1deg) translateX(1px); }
+            50% { transform: rotate(0deg) translateX(0px); }
+            75% { transform: rotate(-1deg) translateX(-1px); }
+            100% { transform: rotate(0deg); }
+        }
+
+        /* Particle trail effect indicator */
+        .particle-trails-active::after {
+            content: '✨';
+            position: absolute;
+            right: -5px;
+            top: -5px;
+            animation: sparkle 1s ease-in-out infinite;
+        }
+
+        @keyframes sparkle {
+            0%, 100% { opacity: 0; transform: scale(0.5); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+
+        /* Sound effects indicator */
+        .sound-effects-active::after {
+            content: '🔊';
+            position: absolute;
+            right: -5px;
+            top: -5px;
+            animation: soundWave 0.8s ease-in-out infinite;
+        }
+
+        @keyframes soundWave {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+        }
+
+        /* Interactive cursor styles */
+        .simulation-area canvas {
+            cursor: default;
+        }
+
+        .simulation-area canvas.interactive-drag {
+            cursor: grab;
+        }
+
+        .simulation-area canvas.interactive-force {
+            cursor: crosshair;
+        }
+
+        .simulation-area canvas.dragging {
+            cursor: grabbing;
+        }
+
+        /* Fun mode background effects */
+        .fun-mode-disco {
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(255, 0, 128, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 50%, rgba(0, 255, 128, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(128, 0, 255, 0.1) 0%, transparent 50%);
+            animation: discoBackground 3s ease-in-out infinite;
+        }
+
+        @keyframes discoBackground {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -628,6 +811,63 @@
                 </div>
             </div>
 
+            <!-- Connection Type Controls -->
+            <div class="control-section">
+                <h4>Connection Type 🔗</h4>
+                <div class="mode-buttons">
+                    <button id="rod-mode" class="mode-btn active">🦴 Rigid Rod</button>
+                    <button id="string-mode" class="mode-btn">🧵 String</button>
+                    <button id="spring-mode" class="mode-btn">🌸 Spring</button>
+                    <button id="noodle-mode" class="mode-btn">🍝 Noodle</button>
+                </div>
+            </div>
+
+            <!-- String Physics Controls -->
+            <div class="control-section" id="string-controls" style="display: none;">
+                <h4>String Properties 🎯</h4>
+                <div class="control-group">
+                    <label>String Tension: <span id="tension-value">100</span>N</label>
+                    <input type="range" id="tension-slider" min="10" max="500" step="5" value="100">
+                </div>
+                <div class="control-group">
+                    <label>Elasticity: <span id="elasticity-value">0.1</span></label>
+                    <input type="range" id="elasticity-slider" min="0" max="1" step="0.05" value="0.1">
+                </div>
+                <div class="control-group">
+                    <label>String Sag: <span id="sag-value">0.02</span>m</label>
+                    <input type="range" id="sag-slider" min="0" max="0.1" step="0.01" value="0.02">
+                </div>
+            </div>
+
+            <!-- Fun Mode Controls -->
+            <div class="control-section" id="fun-controls">
+                <h4>Fun Modes 🎪</h4>
+                <div class="mode-buttons">
+                    <button id="jello-mode" class="mode-btn">🍮 Jello</button>
+                    <button id="balloon-mode" class="mode-btn">🎈 Balloons</button>
+                    <button id="disco-mode" class="mode-btn">🕺 Disco</button>
+                    <button id="rainbow-mode" class="mode-btn">🌈 Rainbow</button>
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="sound-effects">
+                        🔊 Sound Effects
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="particle-trails">
+                        ✨ Particle Trails
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="bouncy-walls">
+                        🏀 Bouncy Walls
+                    </label>
+                </div>
+            </div>
+
             <!-- Mode Controls -->
             <div class="control-section">
                 <h4>Simulation Mode</h4>
@@ -636,6 +876,35 @@
                     <button id="trace-mode" class="mode-btn">Trace</button>
                     <button id="chaos-mode" class="mode-btn">Chaos</button>
                     <button id="slow-mode" class="mode-btn">Slow Motion</button>
+                </div>
+            </div>
+
+            <!-- Interactive Controls -->
+            <div class="control-section">
+                <h4>Interactivity 🎮</h4>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="mouse-interaction" checked>
+                        🖱️ Mouse Drag
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="click-force">
+                        👆 Click to Apply Force
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="string-wobble">
+                        🌊 String Wobble
+                    </label>
+                </div>
+                <div class="control-group">
+                    <button id="shake-pendulum" class="mode-btn">🫨 Shake It!</button>
+                </div>
+                <div class="control-group">
+                    <button id="tickle-mode" class="mode-btn">😂 Tickle Mode</button>
                 </div>
             </div>
 
@@ -664,6 +933,12 @@
                     <label>
                         <input type="checkbox" id="show-forces">
                         Show Force Vectors
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="show-string-tension">
+                        🔴 String Tension
                     </label>
                 </div>
             </div>

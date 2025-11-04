@@ -45,6 +45,7 @@ class PendulumVisualization {
         // Background effects
         this.gridOpacity = 0.1;
         this.particles = [];
+        this.particleTrails = [];
         this.initParticles();
     }
     
@@ -166,13 +167,13 @@ class PendulumVisualization {
         const bob2X = this.centerX + positions.bob2.x * this.scale;
         const bob2Y = this.centerY + positions.bob2.y * this.scale;
         
-        // Draw rods
-        this.drawRod(pivotX, pivotY, bob1X, bob1Y, this.colors.rod1, opacity);
-        this.drawRod(bob1X, bob1Y, bob2X, bob2Y, this.colors.rod2, opacity);
+        // Draw connections (rods, strings, etc.)
+        this.drawConnection(physics, pivotX, pivotY, bob1X, bob1Y, this.colors.rod1, opacity);
+        this.drawConnection(physics, bob1X, bob1Y, bob2X, bob2Y, this.colors.rod2, opacity);
         
         // Draw bobs
-        this.drawBob(bob1X, bob1Y, this.colors.bob1, opacity, physics.m1);
-        this.drawBob(bob2X, bob2Y, this.colors.bob2, opacity, physics.m2);
+        this.drawBob(bob1X, bob1Y, this.colors.bob1, opacity, physics.m1, physics);
+        this.drawBob(bob2X, bob2Y, this.colors.bob2, opacity, physics.m2, physics);
         
         // Draw velocity vectors
         if (this.showVelocity) {
@@ -182,6 +183,27 @@ class PendulumVisualization {
         // Draw force vectors
         if (this.showForces) {
             this.drawForceVectors(physics, bob1X, bob1Y, bob2X, bob2Y, opacity);
+        }
+    }
+    
+    /**
+     * Draw connection between points based on pendulum type
+     */
+    drawConnection(physics, x1, y1, x2, y2, color, opacity = 1.0) {
+        const connectionType = physics.pendulumType || 'rod';
+        
+        switch(connectionType) {
+            case 'string':
+                this.drawString(physics, x1, y1, x2, y2, color, opacity);
+                break;
+            case 'spring':
+                this.drawSpring(x1, y1, x2, y2, color, opacity);
+                break;
+            case 'noodle':
+                this.drawNoodle(physics, x1, y1, x2, y2, color, opacity);
+                break;
+            default:
+                this.drawRod(x1, y1, x2, y2, color, opacity);
         }
     }
     
@@ -200,10 +222,179 @@ class PendulumVisualization {
     }
     
     /**
-     * Draw pendulum bob
+     * Draw realistic string with sag and wobble
      */
-    drawBob(x, y, color, opacity = 1.0, mass = 1.0) {
-        const radius = Math.max(8, Math.min(20, mass * 8));
+    drawString(physics, x1, y1, x2, y2, color, opacity = 1.0) {
+        const sag = physics.stringSag || 0.02;
+        const wobble = physics.stringWobble || 0.0;
+        
+        this.ctx.strokeStyle = color + Math.floor(opacity * 255).toString(16).padStart(2, '0');
+        this.ctx.lineWidth = 2;
+        this.ctx.lineCap = 'round';
+        
+        // Calculate string curve with sag
+        const midX = (x1 + x2) / 2;
+        const midY = (y1 + y2) / 2;
+        const distance = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+        const sagAmount = sag * this.scale * (distance / this.scale);
+        
+        // Add wobble effect
+        const wobbleOffset = wobble * Math.sin(physics.time * 5) * 10;
+        
+        const controlX = midX + wobbleOffset;
+        const controlY = midY + sagAmount;
+        
+        // Draw curved string
+        this.ctx.beginPath();
+        this.ctx.moveTo(x1, y1);
+        this.ctx.quadraticCurveTo(controlX, controlY, x2, y2);
+        this.ctx.stroke();
+        
+        // Draw string tension indicator
+        if (physics.showStringTension) {
+            this.drawStringTension(physics, x1, y1, x2, y2);
+        }
+    }
+    
+    /**
+     * Draw spring connection
+     */
+    drawSpring(x1, y1, x2, y2, color, opacity = 1.0) {
+        this.ctx.strokeStyle = color + Math.floor(opacity * 255).toString(16).padStart(2, '0');
+        this.ctx.lineWidth = 2;
+        
+        const coils = 8;
+        const amplitude = 5;
+        
+        this.ctx.beginPath();
+        this.ctx.moveTo(x1, y1);
+        
+        for (let i = 0; i <= coils; i++) {
+            const t = i / coils;
+            const x = x1 + (x2 - x1) * t;
+            const y = y1 + (y2 - y1) * t;
+            const offset = Math.sin(t * Math.PI * coils * 2) * amplitude;
+            
+            // Perpendicular offset
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            const perpX = -dy / length * offset;
+            const perpY = dx / length * offset;
+            
+            this.ctx.lineTo(x + perpX, y + perpY);
+        }
+        
+        this.ctx.stroke();
+    }
+    
+    /**
+     * Draw wobbly noodle connection
+     */
+    drawNoodle(physics, x1, y1, x2, y2, color, opacity = 1.0) {
+        this.ctx.strokeStyle = color + Math.floor(opacity * 255).toString(16).padStart(2, '0');
+        this.ctx.lineWidth = 4;
+        this.ctx.lineCap = 'round';
+        
+        const segments = 10;
+        const wobbliness = 15;
+        
+        this.ctx.beginPath();
+        this.ctx.moveTo(x1, y1);
+        
+        for (let i = 1; i <= segments; i++) {
+            const t = i / segments;
+            let x = x1 + (x2 - x1) * t;
+            let y = y1 + (y2 - y1) * t;
+            
+            // Add random wobbles
+            const wobbleX = Math.sin(physics.time * 3 + i) * wobbliness * (Math.random() - 0.5);
+            const wobbleY = Math.cos(physics.time * 2 + i) * wobbliness * (Math.random() - 0.5);
+            
+            x += wobbleX;
+            y += wobbleY;
+            
+            this.ctx.lineTo(x, y);
+        }
+        
+        this.ctx.lineTo(x2, y2);
+        this.ctx.stroke();
+    }
+    
+    /**
+     * Draw string tension visualization
+     */
+    drawStringTension(physics, x1, y1, x2, y2) {
+        const tension = physics.stringTension || 100;
+        const maxTension = 500;
+        const tensionRatio = Math.min(tension / maxTension, 1);
+        
+        // Color from green (low tension) to red (high tension)
+        const red = Math.floor(255 * tensionRatio);
+        const green = Math.floor(255 * (1 - tensionRatio));
+        const color = `rgb(${red}, ${green}, 0)`;
+        
+        this.ctx.strokeStyle = color;
+        this.ctx.lineWidth = 1;
+        this.ctx.setLineDash([5, 5]);
+        
+        this.ctx.beginPath();
+        this.ctx.moveTo(x1, y1);
+        this.ctx.lineTo(x2, y2);
+        this.ctx.stroke();
+        
+        this.ctx.setLineDash([]); // Reset dash
+    }
+    
+    /**
+     * Draw pendulum bob with fun mode effects
+     */
+    drawBob(x, y, color, opacity = 1.0, mass = 1.0, physics = null) {
+        let radius = Math.max(8, Math.min(20, mass * 8));
+        let bobColor = color;
+        
+        // Apply fun mode effects
+        if (physics && physics.funMode) {
+            switch(physics.funMode) {
+                case 'jello':
+                    // Jello bobs are wobbly and semi-transparent
+                    radius *= (1 + Math.sin(physics.time * 8) * 0.2);
+                    bobColor = '#00ff88';
+                    opacity *= 0.8;
+                    break;
+                    
+                case 'balloon':
+                    // Balloon bobs are bigger and colorful
+                    radius *= 1.5;
+                    bobColor = `hsl(${(physics.time * 50) % 360}, 80%, 60%)`;
+                    break;
+                    
+                case 'disco':
+                    // Disco bobs sparkle and change colors
+                    bobColor = `hsl(${(physics.time * 100) % 360}, 100%, 50%)`;
+                    radius *= (1 + Math.sin(physics.time * 20) * 0.1);
+                    break;
+                    
+                case 'rainbow':
+                    // Rainbow bobs cycle through colors smoothly
+                    const hue = (physics.rainbowPhase * 2 + x * 0.1) % 360;
+                    bobColor = `hsl(${hue}, 80%, 60%)`;
+                    break;
+            }
+        }
+        
+        // Tickle mode - bobs giggle and shake
+        if (physics && physics.tickleMode) {
+            x += (Math.random() - 0.5) * 2;
+            y += (Math.random() - 0.5) * 2;
+            
+            // Draw giggle emoji occasionally
+            if (Math.random() < 0.05) {
+                this.ctx.font = '16px Arial';
+                this.ctx.fillStyle = '#ffff00';
+                this.ctx.fillText('😂', x + 15, y - 15);
+            }
+        }
         
         // Bob shadow
         this.ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 0.3})`;
@@ -212,10 +403,23 @@ class PendulumVisualization {
         this.ctx.fill();
         
         // Bob
-        this.ctx.fillStyle = color + Math.floor(opacity * 255).toString(16).padStart(2, '0');
+        this.ctx.fillStyle = bobColor + Math.floor(opacity * 255).toString(16).padStart(2, '0');
         this.ctx.beginPath();
         this.ctx.arc(x, y, radius, 0, 2 * Math.PI);
         this.ctx.fill();
+        
+        // Fun mode extra effects
+        if (physics && physics.funMode === 'disco') {
+            // Disco sparkles
+            for (let i = 0; i < 3; i++) {
+                const sparkleX = x + (Math.random() - 0.5) * radius * 2;
+                const sparkleY = y + (Math.random() - 0.5) * radius * 2;
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.beginPath();
+                this.ctx.arc(sparkleX, sparkleY, 1, 0, 2 * Math.PI);
+                this.ctx.fill();
+            }
+        }
         
         // Bob outline
         this.ctx.strokeStyle = `rgba(0, 0, 0, ${opacity * 0.5})`;
@@ -227,6 +431,11 @@ class PendulumVisualization {
         this.ctx.beginPath();
         this.ctx.arc(x - radius * 0.3, y - radius * 0.3, radius * 0.3, 0, 2 * Math.PI);
         this.ctx.fill();
+        
+        // Particle trails for fun modes
+        if (physics && physics.particleTrails) {
+            this.addParticleTrail(x, y, bobColor);
+        }
     }
     
     /**
@@ -443,6 +652,11 @@ class PendulumVisualization {
                 );
             }
         }
+        
+        // Update and draw particle trails
+        if (physics.particleTrails) {
+            this.updateParticleTrails();
+        }
     }
     
     /**
@@ -484,6 +698,96 @@ class PendulumVisualization {
      */
     toggleOption(option) {
         this[option] = !this[option];
+    }
+    
+    /**
+     * Add particle trail for fun effects
+     */
+    addParticleTrail(x, y, color) {
+        this.particleTrails.push({
+            x: x,
+            y: y,
+            vx: (Math.random() - 0.5) * 2,
+            vy: (Math.random() - 0.5) * 2,
+            color: color,
+            life: 1.0,
+            size: Math.random() * 3 + 1
+        });
+        
+        // Limit particle count
+        if (this.particleTrails.length > 100) {
+            this.particleTrails.splice(0, 10);
+        }
+    }
+    
+    /**
+     * Update and draw particle trails
+     */
+    updateParticleTrails() {
+        for (let i = this.particleTrails.length - 1; i >= 0; i--) {
+            const particle = this.particleTrails[i];
+            
+            // Update particle
+            particle.x += particle.vx;
+            particle.y += particle.vy;
+            particle.life -= 0.02;
+            particle.vy += 0.1; // gravity
+            
+            // Draw particle
+            if (particle.life > 0) {
+                this.ctx.globalAlpha = particle.life;
+                this.ctx.fillStyle = particle.color;
+                this.ctx.beginPath();
+                this.ctx.arc(particle.x, particle.y, particle.size * particle.life, 0, 2 * Math.PI);
+                this.ctx.fill();
+                this.ctx.globalAlpha = 1.0;
+            } else {
+                // Remove dead particles
+                this.particleTrails.splice(i, 1);
+            }
+        }
+    }
+    
+    /**
+     * Add sound effect (visual representation)
+     */
+    addSoundEffect(x, y, type = 'pop') {
+        switch(type) {
+            case 'pop':
+                // Draw expanding circle for pop sound
+                const popRadius = 20;
+                this.ctx.strokeStyle = '#ffffff';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, popRadius, 0, 2 * Math.PI);
+                this.ctx.stroke();
+                break;
+                
+            case 'bounce':
+                // Draw bounce effect
+                this.ctx.fillStyle = '#ffff00';
+                this.ctx.font = '16px Arial';
+                this.ctx.fillText('BOING!', x - 20, y - 20);
+                break;
+                
+            case 'wobble':
+                // Draw wobble effect
+                this.ctx.strokeStyle = '#00ffff';
+                this.ctx.lineWidth = 3;
+                this.ctx.beginPath();
+                for (let angle = 0; angle < Math.PI * 2; angle += 0.1) {
+                    const r = 15 + Math.sin(angle * 5) * 5;
+                    const wobbleX = x + Math.cos(angle) * r;
+                    const wobbleY = y + Math.sin(angle) * r;
+                    if (angle === 0) {
+                        this.ctx.moveTo(wobbleX, wobbleY);
+                    } else {
+                        this.ctx.lineTo(wobbleX, wobbleY);
+                    }
+                }
+                this.ctx.stroke();
+                break;
+        }
     }
     
     /**

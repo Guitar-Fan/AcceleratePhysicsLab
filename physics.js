@@ -51,9 +51,27 @@ class DoublePendulumPhysics {
         this.energyHistory = [];    // Energy conservation tracking
         this.maxTrajectoryLength = 1000;
         
-        // Pendulum type
-        this.pendulumType = 'rod';  // 'rod', 'string', 'spring'
+        // Pendulum type and connection properties
+        this.pendulumType = 'rod';  // 'rod', 'string', 'spring', 'noodle'
+        this.stringTension = 100.0; // String tension force (N)
+        this.elasticity = 0.1;      // String elasticity coefficient
+        this.stringSag = 0.02;      // String sag amount (m)
         this.springConstant = 50.0; // For spring connections
+        this.stringWobble = 0.0;    // String wobble amplitude
+        
+        // Fun mode properties
+        this.funMode = 'normal';    // 'normal', 'jello', 'balloon', 'disco', 'rainbow'
+        this.jelloFactor = 0.8;     // Jello mode elasticity
+        this.balloonBuoyancy = 0.5; // Balloon mode upward force
+        this.discoSpeed = 2.0;      // Disco mode rotation speed
+        this.rainbowPhase = 0;      // Rainbow color cycling
+        
+        // Interactive properties
+        this.mouseInteraction = true;
+        this.clickForce = false;
+        this.bouncyWalls = false;
+        this.tickleMode = false;
+        this.shakeIntensity = 0.0;
     }
     
     /**
@@ -127,12 +145,30 @@ class DoublePendulumPhysics {
         const drag1 = this.calculateAirResistance({ x: v1x, y: v1y }, this.radius1);
         const drag2 = this.calculateAirResistance({ x: v2x, y: v2y }, this.radius2);
         
-        // Calculate elastic forces
+        // Calculate connection forces based on pendulum type
+        let connectionForces = { torque1: 0, torque2: 0 };
+        
+        if (this.pendulumType === 'string') {
+            connectionForces = this.calculateStringForces(theta1, theta2, omega1, omega2);
+        } else if (this.pendulumType === 'spring') {
+            connectionForces = this.calculateSpringForces(theta1, theta2, omega1, omega2);
+        } else if (this.pendulumType === 'noodle') {
+            connectionForces = this.calculateNoodleForces(theta1, theta2, omega1, omega2);
+        }
+        
+        // Calculate elastic forces for rigid rod mode
         const elasticForces = this.calculateElasticForce(theta1, theta2);
         
-        // Total moment of inertia including rods
-        const I1_total = this.I1 + this.rodI1;
-        const I2_total = this.I2 + this.rodI2;
+        // Apply fun mode effects
+        const funForces = this.calculateFunModeForces(theta1, theta2, omega1, omega2);
+        
+        // Total moment of inertia including rods (modified by connection type)
+        let momentMultiplier = 1.0;
+        if (this.pendulumType === 'string') momentMultiplier = 0.8; // Strings have less rotational inertia
+        if (this.pendulumType === 'noodle') momentMultiplier = 0.6; // Noodles are very flexible
+        
+        const I1_total = (this.I1 + this.rodI1) * momentMultiplier;
+        const I2_total = (this.I2 + this.rodI2) * momentMultiplier;
         
         // Denominator for angular acceleration calculations
         const denom = (I1_total + I2_total) * this.m1 + this.m2 * sinDiff * sinDiff;
@@ -146,6 +182,8 @@ class DoublePendulumPhysics {
                 + omega1 * omega1 * this.l1 * cosDiff
             )
             + elasticForces.torque1
+            + connectionForces.torque1
+            + funForces.torque1
             + (drag1.x * Math.cos(theta1) + drag1.y * Math.sin(theta1)) * this.l1
         ) / (this.l1 * denom);
         
@@ -156,6 +194,8 @@ class DoublePendulumPhysics {
                 + omega2 * omega2 * this.l2 * this.m2 * cosDiff
             )
             + elasticForces.torque2
+            + connectionForces.torque2
+            + funForces.torque2
             + (drag2.x * Math.cos(theta2) + drag2.y * Math.sin(theta2)) * this.l2
         ) / (this.l2 * denom);
         
@@ -462,6 +502,175 @@ class ChaosPendulumSystem {
         });
     }
 }
+
+// Add the new physics methods to the DoublePendulumPhysics class prototype
+DoublePendulumPhysics.prototype.calculateStringForces = function(theta1, theta2, omega1, omega2) {
+    // String physics with tension and sag
+    const stringLength1 = this.l1;
+    const stringLength2 = this.l2;
+    
+    // Calculate actual string length vs desired length
+    const pos1 = { x: stringLength1 * Math.sin(theta1), y: -stringLength1 * Math.cos(theta1) };
+    const pos2 = { 
+        x: pos1.x + stringLength2 * Math.sin(theta2), 
+        y: pos1.y - stringLength2 * Math.cos(theta2) 
+    };
+    
+    // String sag effect - creates a natural curve
+    const sagForce1 = this.stringSag * Math.sin(theta1) * this.stringTension;
+    const sagForce2 = this.stringSag * Math.sin(theta2) * this.stringTension;
+    
+    // String elasticity - allows for stretching
+    const stretch1 = Math.abs(theta1) - Math.PI/2;
+    const stretch2 = Math.abs(theta2) - Math.PI/2;
+    const elasticTorque1 = -this.elasticity * stretch1 * 10;
+    const elasticTorque2 = -this.elasticity * stretch2 * 10;
+    
+    // String wobble effect
+    const wobbleTorque1 = this.stringWobble * Math.sin(this.time * 5) * 0.1;
+    const wobbleTorque2 = this.stringWobble * Math.cos(this.time * 7) * 0.1;
+    
+    return {
+        torque1: sagForce1 + elasticTorque1 + wobbleTorque1,
+        torque2: sagForce2 + elasticTorque2 + wobbleTorque2
+    };
+};
+
+DoublePendulumPhysics.prototype.calculateSpringForces = function(theta1, theta2, omega1, omega2) {
+    // Spring connection physics
+    const restAngle1 = Math.PI / 2;
+    const restAngle2 = Math.PI / 2;
+    
+    const springForce1 = -this.springConstant * (theta1 - restAngle1);
+    const springForce2 = -this.springConstant * (theta2 - restAngle2);
+    
+    // Spring damping
+    const dampingForce1 = -omega1 * 0.5;
+    const dampingForce2 = -omega2 * 0.5;
+    
+    return {
+        torque1: springForce1 + dampingForce1,
+        torque2: springForce2 + dampingForce2
+    };
+};
+
+DoublePendulumPhysics.prototype.calculateNoodleForces = function(theta1, theta2, omega1, omega2) {
+    // Noodle physics - very flexible and wobbly
+    const noodleFlex = 0.1;
+    const noodleBend = Math.sin(this.time * 3) * 0.05;
+    
+    // Noodles bend and flex unpredictably
+    const flexTorque1 = noodleFlex * Math.sin(theta1 * 3) * Math.cos(this.time * 2);
+    const flexTorque2 = noodleFlex * Math.cos(theta2 * 2) * Math.sin(this.time * 1.5);
+    
+    // Add random wobbles
+    const randomWobble1 = (Math.random() - 0.5) * 0.02;
+    const randomWobble2 = (Math.random() - 0.5) * 0.02;
+    
+    return {
+        torque1: flexTorque1 + noodleBend + randomWobble1,
+        torque2: flexTorque2 - noodleBend + randomWobble2
+    };
+};
+
+DoublePendulumPhysics.prototype.calculateFunModeForces = function(theta1, theta2, omega1, omega2) {
+    let torque1 = 0;
+    let torque2 = 0;
+    
+    switch(this.funMode) {
+        case 'jello':
+            // Jello physics - everything is bouncy and wobbly
+            const jelloWobble1 = this.jelloFactor * Math.sin(this.time * 8) * 0.1;
+            const jelloWobble2 = this.jelloFactor * Math.cos(this.time * 6) * 0.1;
+            torque1 += jelloWobble1;
+            torque2 += jelloWobble2;
+            break;
+            
+        case 'balloon':
+            // Balloon physics - upward buoyancy force
+            const buoyancyForce1 = this.balloonBuoyancy * Math.cos(theta1) * 0.2;
+            const buoyancyForce2 = this.balloonBuoyancy * Math.cos(theta2) * 0.2;
+            torque1 += buoyancyForce1;
+            torque2 += buoyancyForce2;
+            break;
+            
+        case 'disco':
+            // Disco mode - everything spins faster and grooves
+            const discoSpin1 = this.discoSpeed * Math.sin(this.time * 10) * 0.05;
+            const discoSpin2 = this.discoSpeed * Math.cos(this.time * 12) * 0.05;
+            torque1 += discoSpin1;
+            torque2 += discoSpin2;
+            break;
+            
+        case 'rainbow':
+            // Rainbow mode - colorful oscillations
+            this.rainbowPhase += 0.1;
+            const rainbowForce1 = Math.sin(this.rainbowPhase) * 0.03;
+            const rainbowForce2 = Math.cos(this.rainbowPhase * 1.3) * 0.03;
+            torque1 += rainbowForce1;
+            torque2 += rainbowForce2;
+            break;
+    }
+    
+    // Apply shake effect
+    if (this.shakeIntensity > 0) {
+        torque1 += (Math.random() - 0.5) * this.shakeIntensity;
+        torque2 += (Math.random() - 0.5) * this.shakeIntensity;
+        this.shakeIntensity *= 0.95; // Decay shake over time
+    }
+    
+    // Tickle mode - random gentle nudges
+    if (this.tickleMode) {
+        if (Math.random() < 0.1) { // 10% chance each frame
+            torque1 += (Math.random() - 0.5) * 0.1;
+        }
+        if (Math.random() < 0.1) {
+            torque2 += (Math.random() - 0.5) * 0.1;
+        }
+    }
+    
+    return { torque1, torque2 };
+};
+
+// Add mouse interaction methods
+DoublePendulumPhysics.prototype.applyMouseForce = function(mouseX, mouseY, canvasWidth, canvasHeight) {
+    if (!this.mouseInteraction) return;
+    
+    // Convert mouse coordinates to physics coordinates
+    const centerX = canvasWidth / 2;
+    const centerY = canvasHeight / 4;
+    const scale = 150; // Same as visualization scale
+    
+    const mousePhysX = (mouseX - centerX) / scale;
+    const mousePhysY = (mouseY - centerY) / scale;
+    
+    // Get bob positions
+    const positions = this.getPositions();
+    
+    // Check if mouse is near either bob
+    const dist1 = Math.sqrt((mousePhysX - positions.bob1.x) ** 2 + (mousePhysY - positions.bob1.y) ** 2);
+    const dist2 = Math.sqrt((mousePhysX - positions.bob2.x) ** 2 + (mousePhysY - positions.bob2.y) ** 2);
+    
+    const threshold = 0.2; // meters
+    
+    if (dist1 < threshold) {
+        // Apply force to first bob
+        const forceX = (mousePhysX - positions.bob1.x) * 5;
+        const forceY = (mousePhysY - positions.bob1.y) * 5;
+        this.externalForce.x = forceX;
+        this.externalForce.y = forceY;
+    } else if (dist2 < threshold) {
+        // Apply force to second bob
+        const forceX = (mousePhysX - positions.bob2.x) * 3;
+        const forceY = (mousePhysY - positions.bob2.y) * 3;
+        this.externalForce.x = forceX;
+        this.externalForce.y = forceY;
+    } else {
+        // Decay external force when not interacting
+        this.externalForce.x *= 0.9;
+        this.externalForce.y *= 0.9;
+    }
+};
 
 // Export for use in main application
 if (typeof module !== 'undefined' && module.exports) {
