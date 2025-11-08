@@ -110,6 +110,11 @@
             height: calc(100vh - 60px);
             gap: 1px;
             background: var(--border-color);
+            transition: grid-template-columns 0.3s ease;
+        }
+
+        .main-container.charts-collapsed {
+            grid-template-columns: 350px 1fr 0px;
         }
 
         /* Control Panel */
@@ -259,6 +264,37 @@
             border-left: 1px solid var(--border-color);
             overflow-y: auto;
             padding: 1rem;
+            position: relative;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .charts-collapsed .data-panel {
+            opacity: 0;
+            transform: translateX(100%);
+            overflow: hidden;
+        }
+
+        .collapse-toggle {
+            position: absolute;
+            left: -40px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--accent-color);
+            border: 1px solid var(--border-color);
+            border-right: none;
+            color: white;
+            padding: 1rem 0.5rem;
+            cursor: pointer;
+            border-radius: 8px 0 0 8px;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+            z-index: 10;
+            box-shadow: -2px 0 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .collapse-toggle:hover {
+            background: var(--warning-color);
+            transform: translateY(-50%) translateX(-2px);
         }
 
         .data-section {
@@ -729,7 +765,8 @@
     <nav class="navbar">
         <a href="DoublePend.html" class="nav-brand">Double Pendulum Lab</a>
         <ul class="nav-links">
-            <li><a href="DoublePend.html" class="nav-link">Simulation</a></li>
+            <li><a href="DoublePend.html" class="nav-link">2D Simulation</a></li>
+            <li><a href="pendulum3d.html" class="nav-link">3D Simulation</a></li>
             <li><a href="equations.html" class="nav-link">Equations</a></li>
             <li><a href="analysis.html" class="nav-link">Analysis</a></li>
         </ul>
@@ -878,25 +915,6 @@
                 </div>
             </div>
 
-            <!-- Energy Analysis -->
-            <div class="control-section">
-                <h4>Energy Analysis</h4>
-                <div id="energy-display">
-                    <div class="data-item">
-                        <span class="data-label">Kinetic:</span>
-                        <span class="data-value">0.000 J</span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">Potential:</span>
-                        <span class="data-value">0.000 J</span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">Total:</span>
-                        <span class="data-value">0.000 J</span>
-                    </div>
-                </div>
-            </div>
-
             <!-- Physics Charts -->
             <div class="control-section">
                 <h4>Physics Charts</h4>
@@ -956,6 +974,7 @@
 
         <!-- Charts Panel -->
         <div class="data-panel">
+            <button class="collapse-toggle" id="collapse-charts" title="Toggle Charts Panel">◀</button>
             <div class="panel-header">
                 <h3>Physics Charts</h3>
             </div>
@@ -979,14 +998,6 @@
                 <span>Double Pendulum Physics Laboratory</span>
                 <span id="simulation-time">Time: 0.00s</span>
             </div>
-            <div class="toolbar-group">
-                <button class="toolbar-btn" onclick="window.open('https://github.com/your-repo', '_blank')">
-                    📊 Source Code
-                </button>
-                <button class="toolbar-btn" onclick="window.open('https://en.wikipedia.org/wiki/Double_pendulum', '_blank')">
-                    📚 Wikipedia
-                </button>
-            </div>
         </div>
     </div>
 
@@ -1001,6 +1012,18 @@
     <script>
         // Add smooth scrolling and animations
         document.addEventListener('DOMContentLoaded', function() {
+            // Charts panel collapse functionality
+            const collapseBtn = document.getElementById('collapse-charts');
+            const mainContainer = document.querySelector('.main-container');
+            let isCollapsed = false;
+
+            collapseBtn.addEventListener('click', function() {
+                isCollapsed = !isCollapsed;
+                mainContainer.classList.toggle('charts-collapsed');
+                collapseBtn.textContent = isCollapsed ? '▶' : '◀';
+                collapseBtn.title = isCollapsed ? 'Show Charts Panel' : 'Hide Charts Panel';
+            });
+
             // Animate control panel entrance
             anime({
                 targets: '.control-panel',

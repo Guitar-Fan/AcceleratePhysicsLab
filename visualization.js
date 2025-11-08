@@ -14,7 +14,8 @@ class PendulumVisualization {
         
         // Visual settings
         this.scale = 150; // Pixels per meter
-        this.centerX = width / 2;
+        // Shift center to left to account for charts panel on right
+        this.centerX = width * 0.4; // Moved from 0.5 to 0.4 to shift left
         this.centerY = height / 4;
         
         // Animation settings
