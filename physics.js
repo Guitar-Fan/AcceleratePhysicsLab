@@ -43,7 +43,7 @@ class DoublePendulumPhysics {
         this.jointStiffness = 1000;  // Joint stiffness (N·m/rad)
         
         // Simulation control
-        this.timeStep = 0.01;       // Integration time step (s)
+        this.timeStep = 0.005;      // Integration time step (s) - reduced for more realistic speed
         this.time = 0.0;            // Current simulation time (s)
         
         // Data collection
@@ -121,11 +121,16 @@ class DoublePendulumPhysics {
     
     calculateElasticForce(theta1, theta2) {
         // Calculate elastic forces in the rods due to bending
-        const bendingAngle1 = Math.abs(theta1) - this.maxJointAngle;
-        const bendingAngle2 = Math.abs(theta2 - theta1) - this.maxJointAngle;
+        // IMPORTANT: Normalize angles first to avoid huge forces during full rotations
+        const normalizedTheta1 = this.normalizeAngle(theta1);
+        const normalizedTheta2 = this.normalizeAngle(theta2);
+        const relativeBendingAngle = this.normalizeAngle(theta2 - theta1);
         
-        const elasticTorque1 = bendingAngle1 > 0 ? -this.jointStiffness * bendingAngle1 * Math.sign(theta1) : 0;
-        const elasticTorque2 = bendingAngle2 > 0 ? -this.jointStiffness * bendingAngle2 * Math.sign(theta2 - theta1) : 0;
+        const bendingAngle1 = Math.abs(normalizedTheta1) - this.maxJointAngle;
+        const bendingAngle2 = Math.abs(relativeBendingAngle) - this.maxJointAngle;
+        
+        const elasticTorque1 = bendingAngle1 > 0 ? -this.jointStiffness * bendingAngle1 * Math.sign(normalizedTheta1) : 0;
+        const elasticTorque2 = bendingAngle2 > 0 ? -this.jointStiffness * bendingAngle2 * Math.sign(relativeBendingAngle) : 0;
         
         return { torque1: elasticTorque1, torque2: elasticTorque2 };
     }
@@ -135,11 +140,12 @@ class DoublePendulumPhysics {
         const sinDiff = Math.sin(theta1 - theta2);
         
         // Get positions and velocities for air resistance calculation
-        const positions = this.getPositions();
-        const v1x = this.omega1 * this.l1 * Math.cos(theta1);
-        const v1y = -this.omega1 * this.l1 * Math.sin(theta1);
-        const v2x = v1x + this.omega2 * this.l2 * Math.cos(theta2);
-        const v2y = v1y - this.omega2 * this.l2 * Math.sin(theta2);
+        // IMPORTANT: Use the omega1/omega2 parameters, not this.omega1/this.omega2
+        // This ensures correct calculations during RK4 intermediate steps
+        const v1x = omega1 * this.l1 * Math.cos(theta1);
+        const v1y = -omega1 * this.l1 * Math.sin(theta1);
+        const v2x = v1x + omega2 * this.l2 * Math.cos(theta2);
+        const v2y = v1y - omega2 * this.l2 * Math.sin(theta2);
         
         // Calculate air resistance
         const drag1 = this.calculateAirResistance({ x: v1x, y: v1y }, this.radius1);
@@ -170,34 +176,36 @@ class DoublePendulumPhysics {
         const I1_total = (this.I1 + this.rodI1) * momentMultiplier;
         const I2_total = (this.I2 + this.rodI2) * momentMultiplier;
         
+        // Standard double pendulum equations from Lagrangian mechanics
         // Denominator for angular acceleration calculations
-        const denom = (I1_total + I2_total) * this.m1 + this.m2 * sinDiff * sinDiff;
+        const denom = this.l1 * this.l2 * (this.m1 + this.m2 * sinDiff * sinDiff);
         
-        // Calculate angular accelerations using modified Lagrangian mechanics
-        const alpha1 = (
-            -this.g * (2 * this.m1 + this.m2) * Math.sin(theta1)
-            - this.m2 * this.g * Math.sin(theta1 - 2 * theta2)
-            - 2 * sinDiff * this.m2 * (
-                omega2 * omega2 * this.l2
-                + omega1 * omega1 * this.l1 * cosDiff
-            )
-            + elasticForces.torque1
-            + connectionForces.torque1
-            + funForces.torque1
-            + (drag1.x * Math.cos(theta1) + drag1.y * Math.sin(theta1)) * this.l1
-        ) / (this.l1 * denom);
+        // Numerators for alpha1 and alpha2
+        // These are the exact equations derived from the Lagrangian
+        const num1 = -this.g * (2 * this.m1 + this.m2) * Math.sin(theta1)
+                    - this.m2 * this.g * Math.sin(theta1 - 2 * theta2)
+                    - 2 * sinDiff * this.m2 * (
+                        omega2 * omega2 * this.l2
+                        + omega1 * omega1 * this.l1 * cosDiff
+                    );
         
-        const alpha2 = (
-            2 * sinDiff * (
-                omega1 * omega1 * this.l1 * (this.m1 + this.m2)
-                + this.g * (this.m1 + this.m2) * Math.cos(theta1)
-                + omega2 * omega2 * this.l2 * this.m2 * cosDiff
-            )
-            + elasticForces.torque2
-            + connectionForces.torque2
-            + funForces.torque2
-            + (drag2.x * Math.cos(theta2) + drag2.y * Math.sin(theta2)) * this.l2
-        ) / (this.l2 * denom);
+        const num2 = 2 * sinDiff * (
+            omega1 * omega1 * this.l1 * (this.m1 + this.m2)
+            + this.g * (this.m1 + this.m2) * Math.cos(theta1)
+            + omega2 * omega2 * this.l2 * this.m2 * cosDiff
+        );
+        
+        // Calculate angular accelerations using corrected equations
+        let alpha1 = num1 / (this.l1 * (2 * this.m1 + this.m2 - this.m2 * Math.cos(2 * (theta1 - theta2))));
+        let alpha2 = num2 / (this.l2 * (2 * this.m1 + this.m2 - this.m2 * Math.cos(2 * (theta1 - theta2))));
+        
+        // Add additional forces/torques
+        alpha1 += (elasticForces.torque1 + connectionForces.torque1 + funForces.torque1) / (this.m1 * this.l1 * this.l1);
+        alpha2 += (elasticForces.torque2 + connectionForces.torque2 + funForces.torque2) / (this.m2 * this.l2 * this.l2);
+        
+        // Add drag torques
+        alpha1 += (drag1.x * Math.cos(theta1) + drag1.y * Math.sin(theta1)) * this.l1 / (this.m1 * this.l1 * this.l1);
+        alpha2 += (drag2.x * Math.cos(theta2) + drag2.y * Math.sin(theta2)) * this.l2 / (this.m2 * this.l2 * this.l2);
         
         // Apply internal damping
         const internalDamping1 = -this.internalDamping * omega1;
@@ -261,7 +269,9 @@ class DoublePendulumPhysics {
         this.omega1 += h * (k1.dOmega1 + 2 * k2.dOmega1 + 2 * k3.dOmega1 + k4.dOmega1) / 6;
         this.omega2 += h * (k1.dOmega2 + 2 * k2.dOmega2 + 2 * k3.dOmega2 + k4.dOmega2) / 6;
         
-        // Normalize angles to [-π, π]
+        // Normalize angles to prevent floating-point drift
+        // Use a smooth modulo operation to avoid discontinuities
+        // This keeps angles in a reasonable range without causing sudden jumps
         this.theta1 = this.normalizeAngle(this.theta1);
         this.theta2 = this.normalizeAngle(this.theta2);
         

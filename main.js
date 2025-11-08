@@ -8,6 +8,7 @@ class DoublePendulumApp {
         // Core components
         this.physics = new DoublePendulumPhysics();
         this.visualization = new PendulumVisualization('pendulum-canvas');
+        this.charts = null;
         this.chaosSystem = null;
         this.controls = null;
         
@@ -97,6 +98,9 @@ class DoublePendulumApp {
      * Initialize core components
      */
     initializeComponents() {
+        // Create charts
+        this.charts = new PhysicsCharts(this.physics);
+        
         // Create controls
         this.controls = new PendulumControls(this.physics, this.visualization, this.chaosSystem);
         
@@ -148,6 +152,11 @@ class DoublePendulumApp {
         // Reset chaos system if exists
         if (this.chaosSystem) {
             this.chaosSystem.reset();
+        }
+        
+        // Clear charts
+        if (this.charts) {
+            this.charts.clear();
         }
         
         // Update controls
@@ -232,6 +241,9 @@ class DoublePendulumApp {
     clearData() {
         this.physics.trajectory = [];
         this.physics.energyHistory = [];
+        if (this.charts) {
+            this.charts.clear();
+        }
         this.showNotification('Data cleared');
     }
     
@@ -239,9 +251,12 @@ class DoublePendulumApp {
      * Setup data collection and analysis
      */
     setupDataCollection() {
-        // Update data display periodically
+        // Update data display and charts periodically
         setInterval(() => {
             this.updateDataDisplay();
+            if (this.charts && this.controls && this.controls.isRunning) {
+                this.charts.update();
+            }
         }, 100);
     }
     

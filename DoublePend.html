@@ -105,7 +105,7 @@
         .main-container {
             margin-top: 60px;
             display: grid;
-            grid-template-columns: 300px 1fr 250px;
+            grid-template-columns: 350px 1fr 400px;
             grid-template-rows: 1fr auto;
             height: calc(100vh - 60px);
             gap: 1px;
@@ -189,6 +189,7 @@
             border-radius: 2px;
             outline: none;
             -webkit-appearance: none;
+            appearance: none;
         }
 
         .control-group input[type="range"]::-webkit-slider-thumb {
@@ -448,20 +449,32 @@
         }
 
         /* Responsive Design */
+        @media (max-width: 1400px) {
+            .main-container {
+                grid-template-columns: 300px 1fr 350px;
+            }
+        }
+
         @media (max-width: 1200px) {
             .main-container {
-                grid-template-columns: 250px 1fr 200px;
+                grid-template-columns: 280px 1fr 300px;
             }
         }
 
         @media (max-width: 768px) {
             .main-container {
                 grid-template-columns: 1fr;
-                grid-template-rows: auto 1fr auto;
+                grid-template-rows: auto 1fr auto auto;
             }
 
-            .control-panel, .data-panel {
+            .control-panel {
+                height: 400px;
+            }
+            
+            .data-panel {
                 height: 300px;
+                border-left: none;
+                border-top: 1px solid var(--border-color);
             }
 
             .navbar {
@@ -714,11 +727,10 @@
 <body>
     <!-- Navigation -->
     <nav class="navbar">
-        <a href="index.html" class="nav-brand">Double Pendulum Lab</a>
+        <a href="DoublePend.html" class="nav-brand">Double Pendulum Lab</a>
         <ul class="nav-links">
-            <li><a href="index.html" class="nav-link">Simulation</a></li>
-            <li><a href="chaos.html" class="nav-link">Chaos Theory</a></li>
-            <li><a href="education.html" class="nav-link">Education</a></li>
+            <li><a href="DoublePend.html" class="nav-link">Simulation</a></li>
+            <li><a href="equations.html" class="nav-link">Equations</a></li>
             <li><a href="analysis.html" class="nav-link">Analysis</a></li>
         </ul>
     </nav>
@@ -728,7 +740,7 @@
         <!-- Control Panel -->
         <div class="control-panel">
             <div class="panel-header">
-                <h3>Physics Laboratory</h3>
+                <h3>Physics Controls</h3>
                 <div class="panel-controls">
                     <button id="play-pause-btn" class="control-btn" title="Play/Pause (Space)">▶️</button>
                     <button id="reset-btn" class="control-btn" title="Reset (R)">🔄</button>
@@ -737,14 +749,14 @@
             </div>
 
             <!-- Presets -->
-            <div class="data-section">
+            <div class="control-section">
                 <h4>Presets</h4>
                 <div class="preset-container" id="preset-container">
                     <!-- Preset buttons will be added by JavaScript -->
                 </div>
             </div>
 
-            <!-- Physics Controls -->
+            <!-- Physical Parameters -->
             <div class="control-section">
                 <h4>Physical Parameters</h4>
                 <div class="control-group">
@@ -781,18 +793,18 @@
                     <input type="range" id="theta2-slider" min="-180" max="180" step="1" value="90">
                 </div>
                 <div class="control-group">
-                    <label>Velocity 1 (°/s): <span id="omega1-value">0.0</span></label>
-                    <input type="range" id="omega1-slider" min="-360" max="360" step="1" value="0">
+                    <label>Angular Velocity 1 (°/s): <span id="omega1-value">0.0</span></label>
+                    <input type="range" id="omega1-slider" min="-360" max="360" step="5" value="0">
                 </div>
                 <div class="control-group">
-                    <label>Velocity 2 (°/s): <span id="omega2-value">0.0</span></label>
-                    <input type="range" id="omega2-slider" min="-360" max="360" step="1" value="0">
+                    <label>Angular Velocity 2 (°/s): <span id="omega2-value">0.0</span></label>
+                    <input type="range" id="omega2-slider" min="-360" max="360" step="5" value="0">
                 </div>
             </div>
 
-            <!-- Environment -->
+            <!-- Simulation Settings -->
             <div class="control-section">
-                <h4>Environment</h4>
+                <h4>Simulation Settings</h4>
                 <div class="control-group">
                     <label>Simulation Speed: <span id="speed-value">1.00×</span></label>
                     <input type="range" id="speed-slider" min="0.1" max="2.0" step="0.1" value="1.0">
@@ -801,116 +813,22 @@
                     <label>Air Resistance: <span id="damping-value">0.00</span></label>
                     <input type="range" id="damping-slider" min="0.0" max="0.1" step="0.01" value="0.0">
                 </div>
-                <div class="control-group">
-                    <label>External Force X: <span id="force-x-value">0.0</span></label>
-                    <input type="range" id="force-x-slider" min="-10" max="10" step="0.5" value="0">
-                </div>
-                <div class="control-group">
-                    <label>External Force Y: <span id="force-y-value">0.0</span></label>
-                    <input type="range" id="force-y-slider" min="-10" max="10" step="0.5" value="0">
-                </div>
             </div>
 
-            <!-- Connection Type Controls -->
+            <!-- Simulation Mode -->
             <div class="control-section">
-                <h4>Connection Type 🔗</h4>
-                <div class="mode-buttons">
-                    <button id="rod-mode" class="mode-btn active">🦴 Rigid Rod</button>
-                    <button id="string-mode" class="mode-btn">🧵 String</button>
-                    <button id="spring-mode" class="mode-btn">🌸 Spring</button>
-                    <button id="noodle-mode" class="mode-btn">🍝 Noodle</button>
-                </div>
-            </div>
-
-            <!-- String Physics Controls -->
-            <div class="control-section" id="string-controls" style="display: none;">
-                <h4>String Properties 🎯</h4>
-                <div class="control-group">
-                    <label>String Tension: <span id="tension-value">100</span>N</label>
-                    <input type="range" id="tension-slider" min="10" max="500" step="5" value="100">
-                </div>
-                <div class="control-group">
-                    <label>Elasticity: <span id="elasticity-value">0.1</span></label>
-                    <input type="range" id="elasticity-slider" min="0" max="1" step="0.05" value="0.1">
-                </div>
-                <div class="control-group">
-                    <label>String Sag: <span id="sag-value">0.02</span>m</label>
-                    <input type="range" id="sag-slider" min="0" max="0.1" step="0.01" value="0.02">
-                </div>
-            </div>
-
-            <!-- Fun Mode Controls -->
-            <div class="control-section" id="fun-controls">
-                <h4>Fun Modes 🎪</h4>
-                <div class="mode-buttons">
-                    <button id="jello-mode" class="mode-btn">🍮 Jello</button>
-                    <button id="balloon-mode" class="mode-btn">🎈 Balloons</button>
-                    <button id="disco-mode" class="mode-btn">🕺 Disco</button>
-                    <button id="rainbow-mode" class="mode-btn">🌈 Rainbow</button>
-                </div>
-                <div class="control-group">
-                    <label>
-                        <input type="checkbox" id="sound-effects">
-                        🔊 Sound Effects
-                    </label>
-                </div>
-                <div class="control-group">
-                    <label>
-                        <input type="checkbox" id="particle-trails">
-                        ✨ Particle Trails
-                    </label>
-                </div>
-                <div class="control-group">
-                    <label>
-                        <input type="checkbox" id="bouncy-walls">
-                        🏀 Bouncy Walls
-                    </label>
-                </div>
-            </div>
-
-            <!-- Mode Controls -->
-            <div class="control-section">
-                <h4>Simulation Mode</h4>
+                <h4>Visualization Mode</h4>
                 <div class="mode-buttons">
                     <button id="normal-mode" class="mode-btn active">Normal</button>
-                    <button id="trace-mode" class="mode-btn">Trace</button>
+                    <button id="trace-mode" class="mode-btn">Trace Path</button>
                     <button id="chaos-mode" class="mode-btn">Chaos</button>
                     <button id="slow-mode" class="mode-btn">Slow Motion</button>
                 </div>
             </div>
 
-            <!-- Interactive Controls -->
+            <!-- Display Options -->
             <div class="control-section">
-                <h4>Interactivity 🎮</h4>
-                <div class="control-group">
-                    <label>
-                        <input type="checkbox" id="mouse-interaction" checked>
-                        🖱️ Mouse Drag
-                    </label>
-                </div>
-                <div class="control-group">
-                    <label>
-                        <input type="checkbox" id="click-force">
-                        👆 Click to Apply Force
-                    </label>
-                </div>
-                <div class="control-group">
-                    <label>
-                        <input type="checkbox" id="string-wobble">
-                        🌊 String Wobble
-                    </label>
-                </div>
-                <div class="control-group">
-                    <button id="shake-pendulum" class="mode-btn">🫨 Shake It!</button>
-                </div>
-                <div class="control-group">
-                    <button id="tickle-mode" class="mode-btn">😂 Tickle Mode</button>
-                </div>
-            </div>
-
-            <!-- Visualization Controls -->
-            <div class="control-section">
-                <h4>Visualization</h4>
+                <h4>Display Options</h4>
                 <div class="control-group">
                     <label>
                         <input type="checkbox" id="show-trajectory" checked>
@@ -920,7 +838,7 @@
                 <div class="control-group">
                     <label>
                         <input type="checkbox" id="show-energy" checked>
-                        Show Energy
+                        Show Energy Graph
                     </label>
                 </div>
                 <div class="control-group">
@@ -935,23 +853,10 @@
                         Show Force Vectors
                     </label>
                 </div>
-                <div class="control-group">
-                    <label>
-                        <input type="checkbox" id="show-string-tension">
-                        🔴 String Tension
-                    </label>
-                </div>
             </div>
-        </div>
 
-        <!-- Simulation Area -->
-        <div class="simulation-area">
-            <canvas id="pendulum-canvas"></canvas>
-        </div>
-
-        <!-- Data Panel -->
-        <div class="data-panel">
-            <div class="data-section">
+            <!-- Real-time Data -->
+            <div class="control-section">
                 <h4>Real-time Data</h4>
                 <div id="state-display">
                     <div class="data-item">
@@ -973,7 +878,8 @@
                 </div>
             </div>
 
-            <div class="data-section">
+            <!-- Energy Analysis -->
+            <div class="control-section">
                 <h4>Energy Analysis</h4>
                 <div id="energy-display">
                     <div class="data-item">
@@ -991,7 +897,37 @@
                 </div>
             </div>
 
-            <div class="data-section" id="chaos-section" style="display: none;">
+            <!-- Physics Charts -->
+            <div class="control-section">
+                <h4>Physics Charts</h4>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="show-energy-chart" checked>
+                        Energy vs Time
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="show-phase-space">
+                        Phase Space (θ vs ω)
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="show-angular-velocity">
+                        Angular Velocities
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="show-trajectory-plot">
+                        Trajectory Plot
+                    </label>
+                </div>
+            </div>
+
+            <!-- Chaos Analysis (Hidden by default) -->
+            <div class="control-section" id="chaos-section" style="display: none;">
                 <h4>Chaos Analysis</h4>
                 <div id="chaos-display">
                     <div class="data-item">
@@ -1005,13 +941,36 @@
                 </div>
             </div>
 
-            <div class="data-section">
+            <!-- Data Export -->
+            <div class="control-section">
                 <h4>Data Export</h4>
-                <div class="toolbar-group">
-                    <button id="export-btn" class="toolbar-btn">Export Data</button>
-                    <button id="clear-data-btn" class="toolbar-btn">Clear Data</button>
-                </div>
+                <button id="export-btn" class="toolbar-btn" style="width: 100%; margin-bottom: 0.5rem;">Export CSV</button>
+                <button id="clear-data-btn" class="toolbar-btn" style="width: 100%;">Clear Data</button>
             </div>
+        </div>
+
+        <!-- Simulation Area -->
+        <div class="simulation-area">
+            <canvas id="pendulum-canvas"></canvas>
+        </div>
+
+        <!-- Charts Panel -->
+        <div class="data-panel">
+            <div class="panel-header">
+                <h3>Physics Charts</h3>
+            </div>
+            
+            <!-- Energy Chart -->
+            <div id="energy-chart-container" style="width: 100%; height: 200px; margin-bottom: 1rem;"></div>
+            
+            <!-- Phase Space Chart -->
+            <div id="phase-space-container" style="width: 100%; height: 200px; margin-bottom: 1rem; display: none;"></div>
+            
+            <!-- Angular Velocity Chart -->
+            <div id="angular-velocity-container" style="width: 100%; height: 200px; margin-bottom: 1rem; display: none;"></div>
+            
+            <!-- Trajectory Plot -->
+            <div id="trajectory-chart-container" style="width: 100%; height: 200px; display: none;"></div>
         </div>
 
         <!-- Bottom Toolbar -->
@@ -1034,6 +993,7 @@
     <!-- Load JavaScript Files -->
     <script src="physics.js"></script>
     <script src="visualization.js"></script>
+    <script src="charts.js"></script>
     <script src="controls.js"></script>
     <script src="main.js"></script>
 

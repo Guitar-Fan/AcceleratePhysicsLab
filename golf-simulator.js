@@ -50,7 +50,7 @@ class GolfSimulator {
         // Physics parameters - FIXED VALUES (shoulder at 1.5m, ground at 0m)
         this.params = {
             armLength: 0.6,   // Realistic arm length - FIXED
-            clubLength: 0.9,  // Realistic club length - FIXED (total 1.4m < 1.5m shoulder height)
+            clubLength: 1.0,  // Realistic club length - FIXED (total 1.4m < 1.5m shoulder height)
             armMass: 70,      // Effective arm mass
             clubMass: 0.45,   // Golf club mass
             damping: 0.05,
@@ -129,7 +129,7 @@ class GolfSimulator {
         });
         
         Object.defineProperty(this.params, 'clubLength', {
-            value: 0.9,
+            value: 1.0,
             writable: false,
             configurable: false
         });
