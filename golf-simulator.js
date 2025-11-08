@@ -44,8 +44,40 @@ class GolfSimulator {
             maxHeight: 0,
             bounceCount: 0,
             rollDistance: 0,
-            carryDistance: 0
+            carryDistance: 0,
+            launchSpeed: 0,
+            launchAngle: 0,
+            hangTime: 0,
+            smashFactor: 0,
+            spinRate: 0
         };
+        
+        // Wind conditions
+        this.wind = {
+            speed: 0,      // m/s
+            direction: 0   // degrees (0 = tailwind, 180 = headwind)
+        };
+        
+        // Club characteristics
+        this.clubs = {
+            driver: { length: 1.15, loft: 10.5, mass: 0.2, distance: '220-280m' },
+            '3wood': { length: 1.08, loft: 15, mass: 0.22, distance: '200-240m' },
+            '5wood': { length: 1.04, loft: 18, mass: 0.23, distance: '180-220m' },
+            '3iron': { length: 1.00, loft: 21, mass: 0.26, distance: '170-210m' },
+            '5iron': { length: 0.97, loft: 27, mass: 0.27, distance: '150-180m' },
+            '7iron': { length: 0.94, loft: 34, mass: 0.28, distance: '140-155m' },
+            '9iron': { length: 0.91, loft: 41, mass: 0.29, distance: '115-135m' },
+            pw: { length: 0.90, loft: 48, mass: 0.30, distance: '100-120m' },
+            sw: { length: 0.89, loft: 56, mass: 0.31, distance: '70-90m' }
+        };
+        this.currentClub = '7iron';
+        
+        // Shot history
+        this.shotHistory = [];
+        
+        // 2D Trajectory Canvas
+        this.trajectoryCanvas = null;
+        this.trajectoryCtx = null;
         
         // Physics parameters - FIXED VALUES (shoulder at 1.5m, ground at 0m)
         this.params = {
@@ -68,6 +100,9 @@ class GolfSimulator {
             swingForce: 500,
             ballMass: 0.046   // Golf ball mass in kg
         };
+        
+        // Update club length based on selected club
+        this.updateClubParameters();
         
         // Animation state
         this.isSwinging = false;
@@ -108,13 +143,288 @@ class GolfSimulator {
         // Lock physics parameters to prevent modification
         this.lockPhysicsParameters();
         
+        console.log('🔧 Initializing components...');
         this.initializeThreeJS();
         this.createScene();
         this.setupControls();
         this.setupEventListeners();
+        this.initializeTrajectoryCanvas();
         this.animate();
         
         console.log('✅ Golf Simulator ready!');
+    }
+    
+    /**
+     * Update club parameters based on selected club
+     */
+    updateClubParameters() {
+        const club = this.clubs[this.currentClub];
+        this.params.clubLength = club.length;
+        this.params.clubMass = club.mass;
+        
+        // Update UI
+        const clubInfo = {
+            length: document.getElementById('club-length'),
+            loft: document.getElementById('club-loft'),
+            distance: document.getElementById('club-distance')
+        };
+        
+        if (clubInfo.length) clubInfo.length.textContent = club.length.toFixed(2) + 'm';
+        if (clubInfo.loft) clubInfo.loft.textContent = club.loft + '°';
+        if (clubInfo.distance) clubInfo.distance.textContent = club.distance;
+    }
+    
+    /**
+     * Initialize 2D trajectory canvas
+     */
+    initializeTrajectoryCanvas() {
+        console.log('🎨 Attempting to initialize trajectory canvas...');
+        this.trajectoryCanvas = document.getElementById('trajectory-canvas');
+        if (!this.trajectoryCanvas) {
+            console.error('❌ Trajectory canvas element not found in DOM!');
+            console.log('Available canvas elements:', document.querySelectorAll('canvas'));
+            return;
+        }
+        this.trajectoryCtx = this.trajectoryCanvas.getContext('2d');
+        console.log('✅ Trajectory canvas initialized:', this.trajectoryCanvas.width, 'x', this.trajectoryCanvas.height);
+        this.drawTrajectoryGrid();
+    }
+    
+    /**
+     * Draw grid and markers on trajectory canvas
+     */
+    drawTrajectoryGrid() {
+        if (!this.trajectoryCtx || !this.trajectoryCanvas) {
+            console.warn('⚠️ Canvas not ready for drawing grid');
+            return;
+        }
+        
+        const ctx = this.trajectoryCtx;
+        const width = this.trajectoryCanvas.width;
+        const height = this.trajectoryCanvas.height;
+        
+        // Clear canvas
+        ctx.clearRect(0, 0, width, height);
+        
+        // Background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.fillRect(0, 0, width, height);
+        
+        // Grid settings
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1;
+        
+        // Vertical grid lines (every 50m)
+        const maxDistance = 300; // meters
+        const scale = width / maxDistance;
+        for (let d = 0; d <= maxDistance; d += 50) {
+            const x = d * scale;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, height);
+            ctx.stroke();
+            
+            // Distance labels
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.font = '10px JetBrains Mono';
+            ctx.fillText(d + 'm', x + 2, height - 5);
+        }
+        
+        // Horizontal grid lines (every 10m height)
+        const maxHeight = 50; // meters
+        const heightScale = height / maxHeight;
+        for (let h = 0; h <= maxHeight; h += 10) {
+            const y = height - (h * heightScale);
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(width, y);
+            ctx.stroke();
+            
+            // Height labels
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.font = '10px JetBrains Mono';
+            ctx.fillText(h + 'm', 2, y - 2);
+        }
+        
+        // Ground line
+        ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, height);
+        ctx.lineTo(width, height);
+        ctx.stroke();
+        
+        console.log('✅ Trajectory grid drawn');
+    }
+    
+    /**
+     * Update trajectory canvas with ball flight path
+     */
+    updateTrajectoryCanvas() {
+        if (!this.trajectoryCtx || !this.trajectoryCanvas) {
+            // Don't spam warnings
+            return;
+        }
+        
+        this.drawTrajectoryGrid();
+        
+        if (this.ball.trail.length < 1) {
+            return;
+        }
+        
+        const ctx = this.trajectoryCtx;
+        const width = this.trajectoryCanvas.width;
+        const height = this.trajectoryCanvas.height;
+        const maxDistance = 300;
+        const maxHeight = 50;
+        
+        // Draw trajectory path even with just 1 point
+        if (this.ball.trail.length >= 2) {
+            ctx.strokeStyle = '#00d4ff';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            
+            this.ball.trail.forEach((point, index) => {
+                const x = (point.x / maxDistance) * width;
+                const y = height - ((point.y / maxHeight) * height);
+                
+                if (index === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            ctx.stroke();
+        }
+        
+        // Draw ball position
+        if (this.ball.isFlying || this.ball.isRolling) {
+            const ballX = (this.ball.position.x / maxDistance) * width;
+            const ballY = height - ((this.ball.position.y / maxHeight) * height);
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(ballX, ballY, 4, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+        
+        // Draw carry distance marker
+        if (this.ball.carryDistance > 0) {
+            const carryX = (this.ball.carryDistance / maxDistance) * width;
+            ctx.strokeStyle = '#4ecdc4';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(carryX, 0);
+            ctx.lineTo(carryX, height);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Label
+            ctx.fillStyle = '#4ecdc4';
+            ctx.font = 'bold 10px JetBrains Mono';
+            ctx.fillText('Carry: ' + this.ball.carryDistance.toFixed(1) + 'm', carryX + 3, 15);
+        }
+        
+        // Draw max height marker
+        if (this.ball.maxHeight > 0) {
+            const maxHeightY = height - ((this.ball.maxHeight / maxHeight) * height);
+            ctx.strokeStyle = '#feca57';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.moveTo(0, maxHeightY);
+            ctx.lineTo(width, maxHeightY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Label
+            ctx.fillStyle = '#feca57';
+            ctx.font = 'bold 9px JetBrains Mono';
+            ctx.fillText('Max: ' + this.ball.maxHeight.toFixed(1) + 'm', 5, maxHeightY - 3);
+        }
+    }
+    
+    /**
+     * Update shot statistics display
+     */
+    updateShotStats() {
+        document.getElementById('stat-carry').textContent = this.ball.carryDistance.toFixed(1) + ' m';
+        document.getElementById('stat-total').textContent = this.ball.maxDistance.toFixed(1) + ' m';
+        document.getElementById('stat-height').textContent = this.ball.maxHeight.toFixed(1) + ' m';
+        document.getElementById('stat-speed').textContent = this.ball.launchSpeed.toFixed(1) + ' m/s';
+        document.getElementById('stat-launch').textContent = this.ball.launchAngle.toFixed(1) + '°';
+        document.getElementById('stat-hangtime').textContent = this.ball.hangTime.toFixed(2) + ' s';
+        document.getElementById('stat-spin').textContent = Math.round(this.ball.spinRate) + ' rpm';
+        document.getElementById('stat-smash').textContent = this.ball.smashFactor.toFixed(2);
+    }
+    
+    /**
+     * Add shot to history
+     */
+    addToHistory() {
+        const shot = {
+            club: this.currentClub,
+            carry: this.ball.carryDistance.toFixed(1),
+            total: this.ball.maxDistance.toFixed(1),
+            height: this.ball.maxHeight.toFixed(1),
+            speed: this.ball.launchSpeed.toFixed(1),
+            angle: this.ball.launchAngle.toFixed(1),
+            spin: Math.round(this.ball.spinRate),
+            wind: this.wind.speed.toFixed(1),
+            timestamp: new Date().toLocaleTimeString()
+        };
+        
+        this.shotHistory.unshift(shot);
+        if (this.shotHistory.length > 10) this.shotHistory.pop();
+        
+        this.updateHistoryDisplay();
+    }
+    
+    /**
+     * Update shot history display
+     */
+    updateHistoryDisplay() {
+        const historyEl = document.getElementById('shot-history');
+        
+        if (this.shotHistory.length === 0) {
+            historyEl.innerHTML = '<div style="color: var(--text-secondary); text-align: center; padding: 1rem;">No shots recorded yet</div>';
+            return;
+        }
+        
+        let html = '';
+        this.shotHistory.forEach((shot, index) => {
+            html += `
+                <div style="
+                    background: rgba(0, 212, 255, 0.05);
+                    border: 1px solid rgba(0, 212, 255, 0.2);
+                    border-radius: 4px;
+                    padding: 0.5rem;
+                    margin-bottom: 0.5rem;
+                ">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem;">
+                        <span style="color: #00d4ff; font-weight: 600;">#${index + 1} ${shot.club.toUpperCase()}</span>
+                        <span style="color: var(--text-secondary); font-size: 0.65rem;">${shot.timestamp}</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; font-size: 0.7rem;">
+                        <div>Total: <span style="color: #4ecdc4;">${shot.total}m</span></div>
+                        <div>Carry: <span style="color: #4ecdc4;">${shot.carry}m</span></div>
+                        <div>Height: <span style="color: #feca57;">${shot.height}m</span></div>
+                        <div>Speed: <span style="color: #ff6b6b;">${shot.speed}m/s</span></div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        historyEl.innerHTML = html;
+    }
+    
+    /**
+     * Clear shot history
+     */
+    clearHistory() {
+        this.shotHistory = [];
+        this.updateHistoryDisplay();
     }
     
     /**
@@ -351,6 +661,14 @@ class GolfSimulator {
         this.ball.mesh = new THREE.Mesh(ballGeometry, ballMaterial);
         this.ball.mesh.position.set(0, 0.021, 0); // On tee
         this.ball.mesh.castShadow = true;
+        
+        // Add spin indicator (red line on ball)
+        const spinLineGeometry = new THREE.CylinderGeometry(0.002, 0.002, 0.042);
+        const spinLineMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+        this.ball.spinIndicator = new THREE.Mesh(spinLineGeometry, spinLineMaterial);
+        this.ball.spinIndicator.rotation.z = Math.PI / 2;
+        this.ball.mesh.add(this.ball.spinIndicator);
+        
         this.scene.add(this.ball.mesh);
         
         // Reset ball state
@@ -361,7 +679,7 @@ class GolfSimulator {
         this.ball.maxDistance = 0;
         this.ball.maxHeight = 0;
         
-        console.log('⚪ Golf ball created');
+        console.log('⚪ Golf ball created with spin indicator');
     }
     
     /**
@@ -512,6 +830,24 @@ class GolfSimulator {
         // Equations toggle button
         document.getElementById('equations-btn').addEventListener('click', () => {
             this.toggleEquationsDisplay();
+        });
+        
+        // Club selection
+        document.getElementById('club-select').addEventListener('change', (e) => {
+            this.currentClub = e.target.value;
+            this.updateClubParameters();
+            this.resetSimulation();
+        });
+        
+        // Wind controls
+        document.getElementById('wind-speed').addEventListener('input', (e) => {
+            this.wind.speed = parseFloat(e.target.value);
+            document.getElementById('wind-speed-value').textContent = this.wind.speed.toFixed(1) + ' m/s';
+        });
+        
+        document.getElementById('wind-direction').addEventListener('input', (e) => {
+            this.wind.direction = parseFloat(e.target.value);
+            document.getElementById('wind-dir-value').textContent = this.wind.direction + '°';
         });
         
         // Window resize
@@ -694,14 +1030,17 @@ class GolfSimulator {
         const smashFactor = 1.45;
         const ballSpeed = clubHeadSpeed * smashFactor;
         
+        // Get club characteristics
+        const club = this.clubs[this.currentClub];
+        
         // Launch angle calculation based on club loft and attack angle
-        const clubLoft = 10.5; // degrees (driver loft)
+        const clubLoft = club.loft; // degrees
         const attackAngle = this.params.clubAngle * 180 / Math.PI; // degrees
         const launchAngle = clubLoft + (attackAngle * 0.7); // Dynamic loft
-        const launchAngleRad = Math.max(5, Math.min(25, launchAngle)) * Math.PI / 180;
+        const launchAngleRad = Math.max(5, Math.min(45, launchAngle)) * Math.PI / 180;
         
-        // Spin calculation - backspin affects trajectory
-        const spinRate = Math.abs(attackAngle) * 100 + 2000; // rpm
+        // Spin calculation - backspin affects trajectory (more loft = more spin)
+        const spinRate = Math.abs(attackAngle) * 50 + (clubLoft * 50) + 2000; // rpm
         const spinRateRadS = spinRate * 2 * Math.PI / 60; // rad/s
         
         // Initial velocity components with Magnus effect consideration
@@ -709,23 +1048,30 @@ class GolfSimulator {
         this.ball.velocity.y = ballSpeed * Math.sin(launchAngleRad);
         this.ball.velocity.z = 0;
         
+        // Store launch statistics
+        this.ball.launchSpeed = ballSpeed;
+        this.ball.launchAngle = launchAngle;
+        this.ball.smashFactor = smashFactor;
+        this.ball.spinRate = spinRate; // Store in rpm for display
+        this.ball.spinRateRadS = spinRateRadS; // Store in rad/s for physics
+        this.ball.hangTime = 0;
+        
         // Store physics data for calculations
-        this.ball.spinRate = spinRateRadS;
         this.ball.isFlying = true;
         
         // Switch to follow camera
         this.cameraSystem.mode = 'follow';
         this.cameraSystem.followTarget = this.ball.mesh;
         
-        // Update displays with detailed physics
-        document.getElementById('club-speed').textContent = `${clubHeadSpeed.toFixed(1)} m/s`;
-        document.getElementById('ball-speed').textContent = `${ballSpeed.toFixed(1)} m/s`;
+        // Update stat displays immediately
+        this.updateShotStats();
         
         // Log physics equations
         console.log(`📊 Impact Physics:`);
+        console.log(`   Club: ${this.currentClub} (${clubLoft}° loft)`);
         console.log(`   Club Head Speed: ${clubHeadSpeed.toFixed(2)} m/s`);
         console.log(`   Smash Factor: ${smashFactor}`);
-        console.log(`   Launch Angle: ${(launchAngleRad * 180/Math.PI).toFixed(1)}°`);
+        console.log(`   Launch Angle: ${launchAngle.toFixed(1)}°`);
         console.log(`   Spin Rate: ${spinRate.toFixed(0)} rpm`);
         console.log(`   Ball Speed: ${ballSpeed.toFixed(2)} m/s`);
         
@@ -783,9 +1129,9 @@ class GolfSimulator {
         // Simplified: lift force perpendicular to velocity and spin axis
         let ax_magnus = 0, ay_magnus = 0, az_magnus = 0;
         
-        if (this.physics.magnusEffect && this.ball.spinRate > 0) {
+        if (this.physics.magnusEffect && this.ball.spinRateRadS > 0) {
             // Backspin creates lift force
-            const magnusCoeff = 0.5 * rho * A * this.ball.spinRate * this.physics.ballRadius;
+            const magnusCoeff = 0.5 * rho * A * this.ball.spinRateRadS * this.physics.ballRadius;
             const liftMagnitude = magnusCoeff * v / this.physics.ballMass;
             
             // Lift is perpendicular to velocity in the xy-plane
@@ -793,10 +1139,19 @@ class GolfSimulator {
             ax_magnus = -liftMagnitude * vy_unit * 0.1;    // Small forward component
         }
         
+        // Wind effect - convert wind direction to force
+        let ax_wind = 0, az_wind = 0;
+        if (this.wind.speed > 0) {
+            const windRad = this.wind.direction * Math.PI / 180;
+            const windForceCoeff = 0.5 * rho * this.wind.speed * Math.abs(v) * Cd * A / this.physics.ballMass;
+            ax_wind = windForceCoeff * Math.cos(windRad);
+            az_wind = windForceCoeff * Math.sin(windRad);
+        }
+        
         // Total acceleration
-        const ax_total = ax_drag + ax_magnus;
+        const ax_total = ax_drag + ax_magnus + ax_wind;
         const ay_total = this.params.gravity + ay_drag + ay_magnus;
-        const az_total = az_drag + az_magnus;
+        const az_total = az_drag + az_magnus + az_wind;
         
         // Update velocity using Verlet integration for stability
         this.ball.velocity.x += ax_total * dt;
@@ -815,26 +1170,38 @@ class GolfSimulator {
             this.ball.position.z
         );
         
+        // Rotate ball to show spin (backspin rotates around z-axis)
+        if (this.ball.spinRateRadS > 0) {
+            this.ball.mesh.rotation.z += this.ball.spinRateRadS * dt;
+        }
+        
+        // Update hang time
+        this.ball.hangTime += dt;
+        
         // Track maximum values
         this.ball.maxDistance = Math.max(this.ball.maxDistance, this.ball.position.x);
         this.ball.maxHeight = Math.max(this.ball.maxHeight, this.ball.position.y);
         
-        // Add to trail (less frequent for performance)
-        if (this.ball.trail.length === 0 || this.ball.trail.length % 5 === 0) {
-            if (this.ball.trail.length > 200) this.ball.trail.shift();
-            this.ball.trail.push({
-                x: this.ball.position.x,
-                y: this.ball.position.y,
-                z: this.ball.position.z
-            });
+        // Add to trail every frame (will thin out for rendering if needed)
+        this.ball.trail.push({
+            x: this.ball.position.x,
+            y: this.ball.position.y,
+            z: this.ball.position.z
+        });
+        
+        // Keep trail size manageable
+        if (this.ball.trail.length > 500) {
+            this.ball.trail.shift();
         }
         
-        // Update displays
-        const currentDistance = Math.sqrt(this.ball.position.x * this.ball.position.x + this.ball.position.z * this.ball.position.z);
-        document.getElementById('ball-distance').textContent = `${currentDistance.toFixed(1)} m`;
-        document.getElementById('ball-height').textContent = `${this.ball.position.y.toFixed(1)} m`;
+        // Update 2D trajectory canvas
+        this.updateTrajectoryCanvas();
+        
+        // Update stat displays
+        this.updateShotStats();
         
         // Update camera to follow ball
+        this.updateFollowCamera();
         this.updateFollowCamera();
         
         // Check if ball hits ground
@@ -955,6 +1322,9 @@ class GolfSimulator {
         this.ball.velocity.y = 0;
         this.ball.velocity.z = 0;
         
+        // Add to shot history
+        this.addToHistory();
+        
         this.finalizeBallStats();
     }
     
@@ -1023,6 +1393,7 @@ class GolfSimulator {
         this.ball.position = { x: 0, y: 0.021, z: 0 };
         this.ball.velocity = { x: 0, y: 0, z: 0 };
         this.ball.mesh.position.set(0, 0.021, 0);
+        this.ball.mesh.rotation.set(0, 0, 0);
         this.ball.isFlying = false;
         this.ball.isRolling = false;
         this.ball.trail = [];
@@ -1031,15 +1402,12 @@ class GolfSimulator {
         this.ball.bounceCount = 0;
         this.ball.rollDistance = 0;
         this.ball.carryDistance = 0;
-        
-        // Reset displays
-        document.getElementById('ball-distance').textContent = '0 m';
-        document.getElementById('ball-height').textContent = '0 m';
-        document.getElementById('ball-speed').textContent = '0 m/s';
-        document.getElementById('club-speed').textContent = '0 m/s';
-        document.getElementById('efficiency').textContent = '0%';
-        document.getElementById('bounce-count').textContent = '0';
-        document.getElementById('roll-distance').textContent = '0 m';
+        this.ball.launchSpeed = 0;
+        this.ball.launchAngle = 0;
+        this.ball.hangTime = 0;
+        this.ball.smashFactor = 0;
+        this.ball.spinRate = 0;
+        this.ball.spinRateRadS = 0;
     }
     
     /**
@@ -1071,6 +1439,12 @@ class GolfSimulator {
         
         // Reset ball
         this.resetBall();
+        
+        // Clear trajectory canvas
+        this.drawTrajectoryGrid();
+        
+        // Reset stats display
+        this.updateShotStats();
         
         // Reset button state
         document.getElementById('swing-btn').textContent = '🏌️ Swing!';

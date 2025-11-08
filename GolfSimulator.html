@@ -50,7 +50,7 @@
         /* Main Layout - Full Screen Simulation */
         .main-container {
             display: grid;
-            grid-template-columns: 280px 1fr;
+            grid-template-columns: 280px 1fr 350px;
             height: 100vh;
         }
 
@@ -458,7 +458,7 @@
             <div class="physics-equations" id="physics-equations" style="
                 position: absolute;
                 bottom: 1rem;
-                right: 1rem;
+                left: 1rem;
                 background: rgba(0, 0, 0, 0.8);
                 backdrop-filter: blur(10px);
                 border: 1px solid var(--glass-border);
@@ -476,6 +476,154 @@
                 <div id="equation-content">
                     <!-- Dynamic equation content -->
                 </div>
+            </div>
+        </div>
+        
+        <!-- Right Panel - 2D Trajectory View & Stats -->
+        <div class="analysis-panel" style="
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border-left: 1px solid var(--glass-border);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        ">
+            <!-- 2D Trajectory Canvas -->
+            <div style="padding: 1rem; border-bottom: 1px solid var(--glass-border);">
+                <div style="font-size: 1rem; font-weight: 600; color: var(--accent-color); margin-bottom: 0.5rem; text-align: center;">
+                    📊 2D Trajectory View
+                </div>
+                <canvas id="trajectory-canvas" width="636" height="400" style="
+                    width: 100%;
+                    height: auto;
+                    background: rgba(0, 0, 0, 0.3);
+                    border-radius: 6px;
+                    border: 1px solid var(--glass-border);
+                    display: block;
+                "></canvas>
+            </div>
+            
+            <!-- Shot Statistics -->
+            <div style="padding: 1rem; border-bottom: 1px solid var(--glass-border);">
+                <div style="font-size: 1rem; font-weight: 600; color: var(--accent-color); margin-bottom: 0.75rem;">
+                    📈 Current Shot Stats
+                </div>
+                <div id="shot-stats" style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; line-height: 1.6;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                        <div>
+                            <div style="color: var(--text-secondary);">Carry Distance</div>
+                            <div style="color: var(--accent-color); font-weight: 600;" id="stat-carry">0 m</div>
+                        </div>
+                        <div>
+                            <div style="color: var(--text-secondary);">Total Distance</div>
+                            <div style="color: var(--accent-color); font-weight: 600;" id="stat-total">0 m</div>
+                        </div>
+                        <div>
+                            <div style="color: var(--text-secondary);">Max Height</div>
+                            <div style="color: var(--success-color); font-weight: 600;" id="stat-height">0 m</div>
+                        </div>
+                        <div>
+                            <div style="color: var(--text-secondary);">Ball Speed</div>
+                            <div style="color: var(--success-color); font-weight: 600;" id="stat-speed">0 m/s</div>
+                        </div>
+                        <div>
+                            <div style="color: var(--text-secondary);">Launch Angle</div>
+                            <div style="color: var(--warning-color); font-weight: 600;" id="stat-launch">0°</div>
+                        </div>
+                        <div>
+                            <div style="color: var(--text-secondary);">Hang Time</div>
+                            <div style="color: var(--warning-color); font-weight: 600;" id="stat-hangtime">0 s</div>
+                        </div>
+                        <div>
+                            <div style="color: var(--text-secondary);">Spin Rate</div>
+                            <div style="color: #ff6b6b; font-weight: 600;" id="stat-spin">0 rpm</div>
+                        </div>
+                        <div>
+                            <div style="color: var(--text-secondary);">Smash Factor</div>
+                            <div style="color: #ff6b6b; font-weight: 600;" id="stat-smash">0.0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Club Selection -->
+            <div style="padding: 1rem; border-bottom: 1px solid var(--glass-border);">
+                <div style="font-size: 1rem; font-weight: 600; color: var(--accent-color); margin-bottom: 0.75rem;">
+                    🏌️ Club Selection
+                </div>
+                <select id="club-select" style="
+                    width: 100%;
+                    padding: 0.6rem;
+                    background: var(--secondary-bg);
+                    color: var(--text-primary);
+                    border: 1px solid var(--glass-border);
+                    border-radius: 6px;
+                    font-size: 0.85rem;
+                    cursor: pointer;
+                ">
+                    <option value="driver">Driver (10.5° loft)</option>
+                    <option value="3wood">3 Wood (15° loft)</option>
+                    <option value="5wood">5 Wood (18° loft)</option>
+                    <option value="3iron">3 Iron (21° loft)</option>
+                    <option value="5iron">5 Iron (27° loft)</option>
+                    <option value="7iron" selected>7 Iron (34° loft)</option>
+                    <option value="9iron">9 Iron (41° loft)</option>
+                    <option value="pw">Pitching Wedge (48° loft)</option>
+                    <option value="sw">Sand Wedge (56° loft)</option>
+                </select>
+                <div id="club-info" style="
+                    margin-top: 0.5rem;
+                    padding: 0.5rem;
+                    background: rgba(0, 212, 255, 0.1);
+                    border-radius: 4px;
+                    font-size: 0.7rem;
+                    line-height: 1.4;
+                ">
+                    <div>Length: <span id="club-length">1.0m</span></div>
+                    <div>Loft: <span id="club-loft">34°</span></div>
+                    <div>Ideal Distance: <span id="club-distance">140-155m</span></div>
+                </div>
+            </div>
+            
+            <!-- Wind Controls -->
+            <div style="padding: 1rem; border-bottom: 1px solid var(--glass-border);">
+                <div style="font-size: 1rem; font-weight: 600; color: var(--accent-color); margin-bottom: 0.75rem;">
+                    💨 Wind Conditions
+                </div>
+                <div style="margin-bottom: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem; font-size: 0.85rem;">
+                        <span>Wind Speed</span>
+                        <span style="color: var(--accent-color); font-family: 'JetBrains Mono', monospace;" id="wind-speed-value">0 m/s</span>
+                    </div>
+                    <input type="range" class="angle-slider" id="wind-speed" 
+                           min="0" max="15" value="0" step="0.5">
+                </div>
+                <div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem; font-size: 0.85rem;">
+                        <span>Wind Direction</span>
+                        <span style="color: var(--accent-color); font-family: 'JetBrains Mono', monospace;" id="wind-dir-value">0°</span>
+                    </div>
+                    <input type="range" class="angle-slider" id="wind-direction" 
+                           min="0" max="360" value="0" step="15">
+                    <div style="margin-top: 0.3rem; font-size: 0.7rem; color: var(--text-secondary);">
+                        0° = Tailwind, 90° = Left to Right, 180° = Headwind, 270° = Right to Left
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Shot History -->
+            <div style="padding: 1rem; flex: 1; overflow-y: auto;">
+                <div style="font-size: 1rem; font-weight: 600; color: var(--accent-color); margin-bottom: 0.75rem;">
+                    📜 Shot History
+                </div>
+                <div id="shot-history" style="font-size: 0.75rem; font-family: 'JetBrains Mono', monospace;">
+                    <div style="color: var(--text-secondary); text-align: center; padding: 1rem;">
+                        No shots recorded yet
+                    </div>
+                </div>
+                <button class="btn btn-secondary" onclick="window.golfSimulator.clearHistory()" style="margin-top: 0.5rem; font-size: 0.8rem;">
+                    Clear History
+                </button>
             </div>
         </div>
     </div>
